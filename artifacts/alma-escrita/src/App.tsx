@@ -25,6 +25,8 @@ const FILTER_KEY = "alma-escrita:last-filter";
 const CUSTOM_FAVORITES_KEY = "alma-escrita:custom-favorites";
 const LAST_GENERATED_KEY = "alma-escrita:last-generated";
 const GEN_FORM_KEY = "alma-escrita:gen-form";
+const RECENT_KEY = "alma-escrita:recent";
+const RECENT_LIMIT = 5;
 
 type Filter =
   | { kind: "none" }
@@ -45,6 +47,23 @@ interface GenForm {
   mood: GenMood;
   recipient: GenRecipient;
 }
+
+type RecentItem =
+  | {
+      kind: "curated";
+      key: string;
+      messageId: string;
+      text: string;
+      label: string;
+      addedAt: number;
+    }
+  | {
+      kind: "generated";
+      key: string;
+      text: string;
+      label: string;
+      addedAt: number;
+    };
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [state, setState] = useState<T>(() => {
@@ -102,9 +121,14 @@ function App() {
   const [customFavorites, setCustomFavorites] = useLocalStorageState<
     GeneratedMessage[]
   >(CUSTOM_FAVORITES_KEY, []);
+  const [recent, setRecent] = useLocalStorageState<RecentItem[]>(
+    RECENT_KEY,
+    [],
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [viewerItem, setViewerItem] = useState<RecentItem | null>(null);
   const generatedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -148,6 +172,13 @@ function App() {
         ? `Para quem se sente ${filter.value.toLowerCase()}`
         : "Todas as mensagens";
 
+  function pushRecent(item: RecentItem) {
+    setRecent((prev) => {
+      const filtered = prev.filter((r) => r.key !== item.key);
+      return [item, ...filtered].slice(0, RECENT_LIMIT);
+    });
+  }
+
   function copyText(text: string, okMsg = "Mensagem copiada com carinho ✦") {
     navigator.clipboard
       .writeText(text)
@@ -162,6 +193,14 @@ function App() {
       .then(() => {
         setLastCopied(m.id);
         setToast("Mensagem copiada com carinho ✦");
+        pushRecent({
+          kind: "curated",
+          key: `c:${m.id}`,
+          messageId: m.id,
+          text: m.text,
+          label: m.category,
+          addedAt: Date.now(),
+        });
       })
       .catch(() => setToast("Não consegui copiar. Tente novamente."));
   }
@@ -216,6 +255,13 @@ function App() {
     };
     setLastGenerated(generated);
     setToast("Mensagem criada com carinho ✨");
+    pushRecent({
+      kind: "generated",
+      key: `g:${generated.id}`,
+      text,
+      label: `Personalizada · ${generated.mood}`,
+      addedAt: Date.now(),
+    });
     requestAnimationFrame(() => {
       generatedRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -231,7 +277,15 @@ function App() {
       lastGenerated.mood,
       lastGenerated.recipient,
     );
-    setLastGenerated({ ...lastGenerated, text, createdAt: Date.now() });
+    const updated = { ...lastGenerated, text, createdAt: Date.now() };
+    setLastGenerated(updated);
+    pushRecent({
+      kind: "generated",
+      key: `g:${updated.id}-${updated.createdAt}`,
+      text,
+      label: `Personalizada · ${updated.mood}`,
+      addedAt: Date.now(),
+    });
   }
 
   const isCustomFavorited =
@@ -336,6 +390,80 @@ function App() {
             </span>
           </button>
         </section>
+
+        {/* Recent messages */}
+        {recent.length > 0 && (
+          <section className="mt-6" aria-labelledby="recent-title">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2
+                id="recent-title"
+                className="font-serif text-base sm:text-lg text-[hsl(var(--foreground))] flex items-center gap-2"
+              >
+                <span aria-hidden>✨</span>
+                Suas últimas mensagens
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecent([]);
+                  setToast("Histórico limpo");
+                }}
+                className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition"
+              >
+                Limpar
+              </button>
+            </div>
+            <ul className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scroll-smooth [scrollbar-width:thin]">
+              {recent.map((r) => (
+                <li
+                  key={r.key}
+                  className="snap-start shrink-0 w-[78%] sm:w-64 rounded-2xl border border-[hsl(var(--border))] bg-white/80 glass p-4 flex flex-col gap-2 hover:shadow-md transition"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setViewerItem(r)}
+                    className="text-left flex-1 group"
+                    aria-label="Ver mensagem novamente"
+                  >
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-[hsl(var(--accent))] font-semibold">
+                      {r.label}
+                    </span>
+                    <p
+                      className="font-serif text-sm leading-snug text-[hsl(var(--foreground))] mt-1.5"
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      “{r.text}”
+                    </p>
+                  </button>
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-[hsl(var(--border))]">
+                    <button
+                      type="button"
+                      onClick={() => setViewerItem(r)}
+                      className="text-xs font-medium text-[hsl(var(--primary))] hover:underline"
+                    >
+                      Ver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyText(`${r.text}\n\n${SIGNATURE}`)
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                    >
+                      <span aria-hidden>⧉</span>
+                      Copiar
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Categories */}
         <section className="mt-10">
@@ -761,6 +889,76 @@ function App() {
                 >
                   <span aria-hidden>←</span>
                   Voltar para a home
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent message viewer */}
+      {viewerItem && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="viewer-title"
+          className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center fade-in"
+        >
+          <div
+            className="absolute inset-0 bg-[hsl(var(--foreground)/0.45)] backdrop-blur-sm"
+            onClick={() => setViewerItem(null)}
+          />
+          <div className="relative w-full sm:max-w-md mx-auto sm:m-6 max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[hsl(var(--background))] shadow-2xl">
+            <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[hsl(var(--border))]">
+              <h2
+                id="viewer-title"
+                className="text-xs uppercase tracking-[0.22em] text-[hsl(var(--accent))] font-semibold truncate"
+              >
+                {viewerItem.label}
+              </h2>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => setViewerItem(null)}
+                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 sm:px-8 py-7 text-center">
+              <p className="font-serif text-lg sm:text-xl leading-relaxed text-[hsl(var(--foreground))] text-balance">
+                “{viewerItem.text}”
+              </p>
+              <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
+                {SIGNATURE}
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyText(`${viewerItem.text}\n\n${SIGNATURE}`)
+                  }
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+                >
+                  <span aria-hidden>⧉</span>
+                  Copiar
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    shareText(`${viewerItem.text}\n\n${SIGNATURE}`)
+                  }
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                >
+                  <span aria-hidden>↗</span>
+                  Compartilhar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewerItem(null)}
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                >
+                  Fechar
                 </button>
               </div>
             </div>
