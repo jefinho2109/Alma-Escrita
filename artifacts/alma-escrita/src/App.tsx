@@ -104,6 +104,7 @@ function App() {
   >(CUSTOM_FAVORITES_KEY, []);
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [creatorOpen, setCreatorOpen] = useState(false);
   const generatedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -111,6 +112,20 @@ function App() {
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!creatorOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setCreatorOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [creatorOpen]);
 
   const filtered: Message[] = useMemo(() => {
     if (showFavorites) {
@@ -297,225 +312,29 @@ function App() {
       </header>
 
       <main className="px-5 sm:px-8 pb-16 max-w-5xl w-full mx-auto flex-1">
-        {/* Personalized message generator */}
+        {/* Personalized message — small entry card */}
         <section className="mt-2">
-          <div className="rounded-3xl p-[1.5px] bg-gradient-to-br from-[hsl(var(--primary))] via-[hsl(var(--accent))] to-[hsl(var(--primary))] shadow-lg shadow-[hsl(var(--primary)/0.15)]">
-            <div className="rounded-3xl bg-white/90 glass p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-5">
-                <div>
-                  <h2 className="font-serif text-2xl sm:text-3xl text-[hsl(var(--primary))] flex items-center gap-2">
-                    <span aria-hidden>✨</span> Criar mensagem personalizada
-                  </h2>
-                  <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
-                    Conte um pouco sobre você — eu escrevo uma mensagem feita só
-                    pra esse momento.
-                  </p>
-                </div>
-              </div>
-
-              <form
-                onSubmit={handleGenerate}
-                className="grid gap-4 sm:grid-cols-3"
-              >
-                <label className="flex flex-col gap-1.5 sm:col-span-3 md:col-span-1">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Nome da pessoa
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="text"
-                    autoComplete="off"
-                    placeholder="Ex.: GT"
-                    value={genForm.name}
-                    onChange={(e) =>
-                      setGenForm({ ...genForm, name: e.target.value })
-                    }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Como você está se sentindo?
-                  </span>
-                  <select
-                    value={genForm.mood}
-                    onChange={(e) =>
-                      setGenForm({
-                        ...genForm,
-                        mood: e.target.value as GenMood,
-                      })
-                    }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
-                  >
-                    {GEN_MOODS.map((m) => (
-                      <option key={m} value={m}>
-                        {m.charAt(0).toUpperCase() + m.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Para quem é a mensagem?
-                  </span>
-                  <select
-                    value={genForm.recipient}
-                    onChange={(e) =>
-                      setGenForm({
-                        ...genForm,
-                        recipient: e.target.value as GenRecipient,
-                      })
-                    }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
-                  >
-                    {GEN_RECIPIENTS.map((r) => (
-                      <option key={r} value={r}>
-                        {r.charAt(0).toUpperCase() + r.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="sm:col-span-3 flex justify-center sm:justify-end">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium shadow-lg shadow-[hsl(var(--primary)/0.25)] hover:opacity-90 transition"
-                  >
-                    <span aria-hidden>✦</span>
-                    Gerar mensagem
-                  </button>
-                </div>
-              </form>
-
-              {lastGenerated && (
-                <div
-                  ref={generatedRef}
-                  className="fade-in mt-7 rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] to-white border border-[hsl(var(--border))] p-6 sm:p-8 text-center"
-                >
-                  <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[hsl(var(--accent))] font-semibold mb-3">
-                    <span className="h-px w-6 bg-[hsl(var(--accent))]" />
-                    Sua mensagem
-                    <span className="h-px w-6 bg-[hsl(var(--accent))]" />
-                  </div>
-                  <p className="font-serif text-xl sm:text-2xl leading-relaxed text-[hsl(var(--foreground))] text-balance">
-                    “{lastGenerated.text}”
-                  </p>
-                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
-                    {SIGNATURE}
-                  </p>
-
-                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyText(`${lastGenerated.text}\n\n${SIGNATURE}`)
-                      }
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
-                    >
-                      <span aria-hidden>⧉</span>
-                      Copiar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        shareWhatsApp(`${lastGenerated.text}\n\n${SIGNATURE}`)
-                      }
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[#25D366] text-white hover:opacity-90 transition"
-                    >
-                      <span aria-hidden>✆</span>
-                      WhatsApp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleCustomFavorite}
-                      className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition ${
-                        isCustomFavorited
-                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] border-transparent"
-                          : "bg-white border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
-                      }`}
-                    >
-                      <span aria-hidden>{isCustomFavorited ? "♥" : "♡"}</span>
-                      {isCustomFavorited ? "Favoritada" : "Favoritar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={regenerate}
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
-                      title="Gerar outra variação com os mesmos dados"
-                    >
-                      <span aria-hidden>↻</span>
-                      Outra
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {customFavorites.length > 0 && (
-                <details className="mt-6 group">
-                  <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-[hsl(var(--primary))] hover:underline">
-                    <span>
-                      Suas mensagens personalizadas salvas (
-                      {customFavorites.length})
-                    </span>
-                    <span aria-hidden className="transition group-open:rotate-180">
-                      ⌄
-                    </span>
-                  </summary>
-                  <ul className="mt-4 grid gap-3">
-                    {customFavorites.map((g) => (
-                      <li
-                        key={g.id}
-                        className="rounded-xl border border-[hsl(var(--border))] bg-white p-4 text-left"
-                      >
-                        <p className="font-serif text-base text-[hsl(var(--foreground))]">
-                          “{g.text}”
-                        </p>
-                        <div className="flex items-center justify-between mt-3">
-                          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                            {g.mood} · {g.recipient}
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                copyText(`${g.text}\n\n${SIGNATURE}`)
-                              }
-                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
-                            >
-                              Copiar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                shareWhatsApp(`${g.text}\n\n${SIGNATURE}`)
-                              }
-                              className="text-xs font-medium px-3 py-1.5 rounded-full bg-[#25D366] text-white hover:opacity-90"
-                            >
-                              WhatsApp
-                            </button>
-                            <button
-                              type="button"
-                              aria-label="Remover dos favoritos"
-                              onClick={() =>
-                                setCustomFavorites((prev) =>
-                                  prev.filter((x) => x.id !== g.id),
-                                )
-                              }
-                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
-                            >
-                              Remover
-                            </button>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+          <button
+            type="button"
+            onClick={() => setCreatorOpen(true)}
+            className="group w-full text-left rounded-2xl border border-[hsl(var(--border))] bg-white/80 glass p-4 sm:p-5 flex items-center gap-4 hover:bg-white hover:shadow-md transition"
+          >
+            <div className="shrink-0 h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-lg shadow-md shadow-[hsl(var(--primary)/0.25)]">
+              <span aria-hidden>✨</span>
             </div>
-          </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-serif text-lg sm:text-xl text-[hsl(var(--foreground))] leading-tight">
+                Criar mensagem personalizada
+              </h2>
+              <p className="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">
+                Receba uma mensagem exclusiva para o seu momento
+              </p>
+            </div>
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-sm font-medium shadow-sm group-hover:shadow-md transition">
+              Criar agora
+              <span aria-hidden>→</span>
+            </span>
+          </button>
         </section>
 
         {/* Categories */}
@@ -696,12 +515,265 @@ function App() {
         </p>
       </footer>
 
+      {/* Creator Modal */}
+      {creatorOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="creator-title"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center fade-in"
+        >
+          <div
+            className="absolute inset-0 bg-[hsl(var(--foreground)/0.45)] backdrop-blur-sm"
+            onClick={() => setCreatorOpen(false)}
+          />
+          <div className="relative w-full sm:max-w-xl mx-auto sm:m-6 max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[hsl(var(--background))] shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 sm:px-7 py-4 bg-[hsl(var(--background))] border-b border-[hsl(var(--border))]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="shrink-0 h-9 w-9 rounded-full bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-sm">
+                  <span aria-hidden>✨</span>
+                </div>
+                <h2
+                  id="creator-title"
+                  className="font-serif text-xl sm:text-2xl text-[hsl(var(--primary))] truncate"
+                >
+                  Criar mensagem personalizada
+                </h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => setCreatorOpen(false)}
+                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-5 sm:px-7 py-6">
+              <p className="text-sm text-[hsl(var(--muted-foreground))] mb-5">
+                Conte um pouco sobre você — eu escrevo uma mensagem feita só
+                pra esse momento.
+              </p>
+
+              <form onSubmit={handleGenerate} className="grid gap-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Nome da pessoa
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="text"
+                    autoComplete="off"
+                    placeholder="Ex.: GT"
+                    value={genForm.name}
+                    onChange={(e) =>
+                      setGenForm({ ...genForm, name: e.target.value })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Como você está se sentindo?
+                  </span>
+                  <select
+                    value={genForm.mood}
+                    onChange={(e) =>
+                      setGenForm({
+                        ...genForm,
+                        mood: e.target.value as GenMood,
+                      })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  >
+                    {GEN_MOODS.map((m) => (
+                      <option key={m} value={m}>
+                        {m.charAt(0).toUpperCase() + m.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Para quem é a mensagem?
+                  </span>
+                  <select
+                    value={genForm.recipient}
+                    onChange={(e) =>
+                      setGenForm({
+                        ...genForm,
+                        recipient: e.target.value as GenRecipient,
+                      })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  >
+                    {GEN_RECIPIENTS.map((r) => (
+                      <option key={r} value={r}>
+                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  type="submit"
+                  className="mt-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium shadow-lg shadow-[hsl(var(--primary)/0.25)] hover:opacity-90 transition"
+                >
+                  <span aria-hidden>✦</span>
+                  Gerar mensagem
+                </button>
+              </form>
+
+              {lastGenerated && (
+                <div
+                  ref={generatedRef}
+                  className="fade-in mt-7 rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] to-white border border-[hsl(var(--border))] p-6 sm:p-7 text-center"
+                >
+                  <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[hsl(var(--accent))] font-semibold mb-3">
+                    <span className="h-px w-6 bg-[hsl(var(--accent))]" />
+                    Sua mensagem
+                    <span className="h-px w-6 bg-[hsl(var(--accent))]" />
+                  </div>
+                  <p className="font-serif text-lg sm:text-xl leading-relaxed text-[hsl(var(--foreground))] text-balance">
+                    “{lastGenerated.text}”
+                  </p>
+                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
+                    {SIGNATURE}
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyText(`${lastGenerated.text}\n\n${SIGNATURE}`)
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                    >
+                      <span aria-hidden>⧉</span>
+                      Copiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        shareText(`${lastGenerated.text}\n\n${SIGNATURE}`)
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+                    >
+                      <span aria-hidden>↗</span>
+                      Compartilhar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleCustomFavorite}
+                      className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition ${
+                        isCustomFavorited
+                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] border-transparent"
+                          : "bg-white border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                      }`}
+                    >
+                      <span aria-hidden>{isCustomFavorited ? "♥" : "♡"}</span>
+                      {isCustomFavorited ? "Favoritada" : "Favoritar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={regenerate}
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                      title="Gerar outra variação com os mesmos dados"
+                    >
+                      <span aria-hidden>↻</span>
+                      Outra
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {customFavorites.length > 0 && (
+                <details className="mt-6 group">
+                  <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-[hsl(var(--primary))] hover:underline">
+                    <span>
+                      Suas mensagens personalizadas salvas (
+                      {customFavorites.length})
+                    </span>
+                    <span aria-hidden className="transition group-open:rotate-180">
+                      ⌄
+                    </span>
+                  </summary>
+                  <ul className="mt-4 grid gap-3">
+                    {customFavorites.map((g) => (
+                      <li
+                        key={g.id}
+                        className="rounded-xl border border-[hsl(var(--border))] bg-white p-4 text-left"
+                      >
+                        <p className="font-serif text-base text-[hsl(var(--foreground))]">
+                          “{g.text}”
+                        </p>
+                        <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
+                          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                            {g.mood} · {g.recipient}
+                          </span>
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyText(`${g.text}\n\n${SIGNATURE}`)
+                              }
+                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                            >
+                              Copiar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                shareText(`${g.text}\n\n${SIGNATURE}`)
+                              }
+                              className="text-xs font-medium px-3 py-1.5 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                            >
+                              Compartilhar
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Remover dos favoritos"
+                              onClick={() =>
+                                setCustomFavorites((prev) =>
+                                  prev.filter((x) => x.id !== g.id),
+                                )
+                              }
+                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+
+              <div className="mt-7 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setCreatorOpen(false)}
+                  className="inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                >
+                  <span aria-hidden>←</span>
+                  Voltar para a home
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-full bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-xl text-sm fade-in z-50"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-full bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-xl text-sm fade-in z-[60]"
         >
           {toast}
         </div>
