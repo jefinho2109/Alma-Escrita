@@ -27,6 +27,7 @@ const LAST_GENERATED_KEY = "alma-escrita:last-generated";
 const GEN_FORM_KEY = "alma-escrita:gen-form";
 const RECENT_KEY = "alma-escrita:recent";
 const RECENT_LIMIT = 5;
+const DAILY_KEY = "alma-escrita:daily";
 
 type Filter =
   | { kind: "none" }
@@ -86,6 +87,33 @@ function useLocalStorageState<T>(key: string, initial: T) {
   return [state, setState] as const;
 }
 
+function todayKey(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function msUntilNextMidnight(d = new Date()): number {
+  const next = new Date(d);
+  next.setHours(24, 0, 0, 50);
+  return next.getTime() - d.getTime();
+}
+
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function pickDaily(dateKey: string): Message {
+  const idx = hashString(dateKey) % MESSAGES.length;
+  return MESSAGES[idx];
+}
+
 function categoryEmoji(c: Category): string {
   switch (c) {
     case "Amor": return "❤";
@@ -125,6 +153,11 @@ function App() {
     RECENT_KEY,
     [],
   );
+  const [daily, setDaily] = useLocalStorageState<{
+    dateKey: string;
+    messageId: string;
+  } | null>(DAILY_KEY, null);
+  const [todayStr, setTodayStr] = useState<string>(() => todayKey());
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
@@ -136,6 +169,41 @@ function App() {
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    function schedule(): number {
+      return window.setTimeout(() => {
+        setTodayStr(todayKey());
+        timer = schedule();
+      }, msUntilNextMidnight());
+    }
+    let timer = schedule();
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        const now = todayKey();
+        setTodayStr((prev) => (prev === now ? prev : now));
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  const dailyMessage: Message = useMemo(() => {
+    if (daily && daily.dateKey === todayStr) {
+      const found = MESSAGES.find((m) => m.id === daily.messageId);
+      if (found) return found;
+    }
+    return pickDaily(todayStr);
+  }, [daily, todayStr]);
+
+  useEffect(() => {
+    if (!daily || daily.dateKey !== todayStr || daily.messageId !== dailyMessage.id) {
+      setDaily({ dateKey: todayStr, messageId: dailyMessage.id });
+    }
+  }, [todayStr, dailyMessage.id, daily, setDaily]);
 
   useEffect(() => {
     if (!creatorOpen) return;
@@ -366,6 +434,49 @@ function App() {
       </header>
 
       <main className="px-5 sm:px-8 pb-16 max-w-5xl w-full mx-auto flex-1">
+        {/* Daily message */}
+        <section className="mt-2 mb-6" aria-labelledby="daily-title">
+          <article className="rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] via-white to-[hsl(var(--secondary))] border border-[hsl(var(--border))] shadow-sm p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2
+                id="daily-title"
+                className="inline-flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-[0.25em] text-[hsl(var(--accent))] font-semibold"
+              >
+                <span className="h-px w-5 bg-[hsl(var(--accent))]" />
+                Mensagem do dia
+                <span className="h-px w-5 bg-[hsl(var(--accent))]" />
+              </h2>
+              <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                {dailyMessage.category}
+              </span>
+            </div>
+            <p className="font-serif text-base sm:text-lg leading-relaxed text-[hsl(var(--foreground))] text-center text-balance">
+              “{dailyMessage.text}”
+            </p>
+            <p className="font-serif italic text-sm text-[hsl(var(--muted-foreground))] mt-3 text-center">
+              {SIGNATURE}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleCopy(dailyMessage)}
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+              >
+                <span aria-hidden>⧉</span>
+                Copiar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleShare(dailyMessage)}
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+              >
+                <span aria-hidden>↗</span>
+                Compartilhar
+              </button>
+            </div>
+          </article>
+        </section>
+
         {/* Personalized message — small entry card */}
         <section className="mt-2">
           <button
