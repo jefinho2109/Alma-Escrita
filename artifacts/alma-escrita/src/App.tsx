@@ -435,7 +435,7 @@ function App() {
             href={ALMA_SONORA_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium shadow-lg shadow-[hsl(var(--primary)/0.25)] hover:opacity-90 transition"
+            className="btn-grad inline-flex items-center gap-2 px-5 py-3 rounded-full font-medium"
           >
             <span aria-hidden>🎧</span>
             <span>Acesse o Alma Sonora</span>
@@ -463,31 +463,31 @@ function App() {
       <main className="px-5 sm:px-8 pb-16 max-w-5xl w-full mx-auto flex-1">
         {/* Daily message */}
         <section className="mt-2 mb-6" aria-labelledby="daily-title">
-          <article className="rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] via-[hsl(var(--card))] to-[hsl(var(--secondary))] border border-[hsl(var(--border))] shadow-sm p-5 sm:p-6">
+          <article className="feature-card rounded-2xl p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2
                 id="daily-title"
-                className="inline-flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-[0.25em] text-[hsl(var(--accent))] font-semibold"
+                className="inline-flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-[0.25em] feature-fg font-semibold"
               >
-                <span className="h-px w-5 bg-[hsl(var(--accent))]" />
+                <span className="h-px w-5 feature-divider" />
                 Mensagem do dia
-                <span className="h-px w-5 bg-[hsl(var(--accent))]" />
+                <span className="h-px w-5 feature-divider" />
               </h2>
-              <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+              <span className="text-[10px] uppercase tracking-wider feature-fg-soft">
                 {dailyMessage.category}
               </span>
             </div>
-            <p className="font-serif text-base sm:text-lg leading-relaxed text-[hsl(var(--foreground))] text-center text-balance">
+            <p className="font-serif text-base sm:text-lg leading-relaxed feature-fg text-center text-balance">
               “{dailyMessage.text}”
             </p>
-            <p className="font-serif italic text-sm text-[hsl(var(--muted-foreground))] mt-3 text-center">
+            <p className="font-serif italic text-sm feature-fg-soft mt-3 text-center">
               {SIGNATURE}
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => handleCopy(dailyMessage)}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+                className="btn-soft inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full"
               >
                 <span aria-hidden>⧉</span>
                 Copiar
@@ -495,7 +495,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => handleShare(dailyMessage)}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
+                className="btn-soft inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full"
               >
                 <span aria-hidden>↗</span>
                 Compartilhar
@@ -522,7 +522,7 @@ function App() {
                 Receba uma mensagem exclusiva para o seu momento
               </p>
             </div>
-            <span className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-sm font-medium shadow-sm group-hover:shadow-md transition">
+            <span className="btn-grad shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium">
               Criar agora
               <span aria-hidden>→</span>
             </span>
@@ -718,10 +718,10 @@ function App() {
                 return (
                   <article
                     key={m.id}
-                    className="fade-in relative rounded-2xl bg-[hsl(var(--card)/0.8)] glass border border-[hsl(var(--border))] p-6 sm:p-7 shadow-sm hover:shadow-md transition"
+                    className="feature-card fade-in relative rounded-2xl p-6 sm:p-7 transition hover:-translate-y-0.5"
                   >
                     <div className="flex items-start justify-between gap-3 mb-4">
-                      <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-[hsl(var(--primary))] font-semibold">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] feature-fg-soft font-semibold">
                         <span aria-hidden>{categoryEmoji(m.category)}</span>
                         {m.category}
                       </span>
@@ -733,19 +733,19 @@ function App() {
                         onClick={() => toggleFavorite(m.id)}
                         className={`text-xl leading-none transition ${
                           fav
-                            ? "text-[hsl(var(--accent))]"
-                            : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--accent))]"
+                            ? "feature-fg"
+                            : "feature-fg-soft hover:feature-fg"
                         }`}
                       >
                         {fav ? "♥" : "♡"}
                       </button>
                     </div>
 
-                    <p className="font-serif text-[1.15rem] sm:text-[1.2rem] leading-relaxed text-[hsl(var(--foreground))] text-balance">
+                    <p className="font-serif text-[1.15rem] sm:text-[1.2rem] leading-relaxed feature-fg text-balance">
                       “{m.text}”
                     </p>
 
-                    <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
+                    <p className="font-serif italic feature-fg-soft mt-4">
                       {SIGNATURE}
                     </p>
 
@@ -753,7 +753,7 @@ function App() {
                       <button
                         type="button"
                         onClick={() => handleCopy(m)}
-                        className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
+                        className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
                       >
                         <span aria-hidden>⧉</span>
                         Copiar
@@ -761,7 +761,7 @@ function App() {
                       <button
                         type="button"
                         onClick={() => handleShare(m)}
-                        className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+                        className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
                       >
                         <span aria-hidden>↗</span>
                         Compartilhar
@@ -886,7 +886,7 @@ function App() {
 
                 <button
                   type="submit"
-                  className="mt-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium shadow-lg shadow-[hsl(var(--primary)/0.25)] hover:opacity-90 transition"
+                  className="btn-grad mt-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium"
                 >
                   <span aria-hidden>✦</span>
                   Gerar mensagem
@@ -926,7 +926,7 @@ function App() {
                       onClick={() =>
                         shareText(`${lastGenerated.text}\n\n${SIGNATURE}`)
                       }
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+                      className="btn-grad inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
                     >
                       <span aria-hidden>↗</span>
                       Compartilhar
@@ -995,7 +995,7 @@ function App() {
                               onClick={() =>
                                 shareText(`${g.text}\n\n${SIGNATURE}`)
                               }
-                              className="text-xs font-medium px-3 py-1.5 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                              className="btn-grad text-xs font-medium px-3 py-1.5 rounded-full"
                             >
                               Compartilhar
                             </button>
@@ -1076,7 +1076,7 @@ function App() {
                   onClick={() =>
                     copyText(`${viewerItem.text}\n\n${SIGNATURE}`)
                   }
-                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition"
+                  className="btn-grad inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
                 >
                   <span aria-hidden>⧉</span>
                   Copiar
