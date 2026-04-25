@@ -28,6 +28,9 @@ const GEN_FORM_KEY = "alma-escrita:gen-form";
 const RECENT_KEY = "alma-escrita:recent";
 const RECENT_LIMIT = 5;
 const DAILY_KEY = "alma-escrita:daily";
+const THEME_KEY = "alma-escrita:theme";
+
+type Theme = "light" | "dark";
 
 type Filter =
   | { kind: "none" }
@@ -158,6 +161,7 @@ function App() {
     messageId: string;
   } | null>(DAILY_KEY, null);
   const [todayStr, setTodayStr] = useState<string>(() => todayKey());
+  const [theme, setTheme] = useLocalStorageState<Theme>(THEME_KEY, "light");
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
@@ -169,6 +173,12 @@ function App() {
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+  }, [theme]);
 
   useEffect(() => {
     function schedule(): number {
@@ -388,7 +398,24 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
+      {/* Theme toggle */}
+      <button
+        type="button"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        aria-label={
+          theme === "dark"
+            ? "Ativar modo claro"
+            : "Ativar modo escuro"
+        }
+        title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+        className="fixed top-4 right-4 sm:top-5 sm:right-5 z-40 h-10 w-10 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.85)] backdrop-blur hover:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-md flex items-center justify-center transition"
+      >
+        <span aria-hidden className="text-lg leading-none">
+          {theme === "dark" ? "☀" : "☾"}
+        </span>
+      </button>
+
       {/* Header / Hero */}
       <header className="px-5 sm:px-8 pt-10 sm:pt-16 pb-6 max-w-5xl w-full mx-auto text-center">
         <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-[hsl(var(--muted-foreground))] mb-5">
@@ -422,7 +449,7 @@ function App() {
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full border border-[hsl(var(--border))] font-medium transition ${
               showFavorites
                 ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] border-transparent"
-                : "bg-white/70 text-[hsl(var(--foreground))] hover:bg-white"
+                : "bg-[hsl(var(--card)/0.7)] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--card))]"
             }`}
           >
             <span aria-hidden>♡</span>
@@ -436,7 +463,7 @@ function App() {
       <main className="px-5 sm:px-8 pb-16 max-w-5xl w-full mx-auto flex-1">
         {/* Daily message */}
         <section className="mt-2 mb-6" aria-labelledby="daily-title">
-          <article className="rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] via-white to-[hsl(var(--secondary))] border border-[hsl(var(--border))] shadow-sm p-5 sm:p-6">
+          <article className="rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] via-[hsl(var(--card))] to-[hsl(var(--secondary))] border border-[hsl(var(--border))] shadow-sm p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2
                 id="daily-title"
@@ -468,7 +495,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => handleShare(dailyMessage)}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
               >
                 <span aria-hidden>↗</span>
                 Compartilhar
@@ -482,7 +509,7 @@ function App() {
           <button
             type="button"
             onClick={() => setCreatorOpen(true)}
-            className="group w-full text-left rounded-2xl border border-[hsl(var(--border))] bg-white/80 glass p-4 sm:p-5 flex items-center gap-4 hover:bg-white hover:shadow-md transition"
+            className="group w-full text-left rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.8)] glass p-4 sm:p-5 flex items-center gap-4 hover:bg-[hsl(var(--card))] hover:shadow-md transition"
           >
             <div className="shrink-0 h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-lg shadow-md shadow-[hsl(var(--primary)/0.25)]">
               <span aria-hidden>✨</span>
@@ -528,7 +555,7 @@ function App() {
               {recent.map((r) => (
                 <li
                   key={r.key}
-                  className="snap-start shrink-0 w-[78%] sm:w-64 rounded-2xl border border-[hsl(var(--border))] bg-white/80 glass p-4 flex flex-col gap-2 hover:shadow-md transition"
+                  className="snap-start shrink-0 w-[78%] sm:w-64 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.8)] glass p-4 flex flex-col gap-2 hover:shadow-md transition"
                 >
                   <button
                     type="button"
@@ -564,7 +591,7 @@ function App() {
                       onClick={() =>
                         copyText(`${r.text}\n\n${SIGNATURE}`)
                       }
-                      className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                      className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                     >
                       <span aria-hidden>⧉</span>
                       Copiar
@@ -598,7 +625,7 @@ function App() {
                   className={`group relative rounded-2xl px-4 py-4 text-left border transition ${
                     active
                       ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] border-transparent shadow-md shadow-[hsl(var(--primary)/0.25)]"
-                      : "bg-white/70 hover:bg-white border-[hsl(var(--border))]"
+                      : "bg-[hsl(var(--card)/0.7)] hover:bg-[hsl(var(--card))] border-[hsl(var(--border))]"
                   }`}
                 >
                   <div
@@ -639,7 +666,7 @@ function App() {
                   className={`px-4 py-2 rounded-full text-sm font-medium border transition ${
                     active
                       ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] border-transparent shadow-md shadow-[hsl(var(--accent)/0.3)]"
-                      : "bg-white/70 hover:bg-white border-[hsl(var(--border))]"
+                      : "bg-[hsl(var(--card)/0.7)] hover:bg-[hsl(var(--card))] border-[hsl(var(--border))]"
                   }`}
                 >
                   {m}
@@ -676,7 +703,7 @@ function App() {
           </h3>
 
           {filtered.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] bg-white/50 p-10 text-center">
+            <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] p-10 text-center">
               <p className="font-serif text-xl text-[hsl(var(--muted-foreground))]">
                 Você ainda não guardou nenhuma mensagem por aqui.
               </p>
@@ -691,7 +718,7 @@ function App() {
                 return (
                   <article
                     key={m.id}
-                    className="fade-in relative rounded-2xl bg-white/80 glass border border-[hsl(var(--border))] p-6 sm:p-7 shadow-sm hover:shadow-md transition"
+                    className="fade-in relative rounded-2xl bg-[hsl(var(--card)/0.8)] glass border border-[hsl(var(--border))] p-6 sm:p-7 shadow-sm hover:shadow-md transition"
                   >
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-[hsl(var(--primary))] font-semibold">
@@ -726,7 +753,7 @@ function App() {
                       <button
                         type="button"
                         onClick={() => handleCopy(m)}
-                        className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                        className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                       >
                         <span aria-hidden>⧉</span>
                         Copiar
@@ -783,7 +810,7 @@ function App() {
                 type="button"
                 aria-label="Fechar"
                 onClick={() => setCreatorOpen(false)}
-                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
+                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
               >
                 ×
               </button>
@@ -809,7 +836,7 @@ function App() {
                     onChange={(e) =>
                       setGenForm({ ...genForm, name: e.target.value })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   />
                 </label>
 
@@ -825,7 +852,7 @@ function App() {
                         mood: e.target.value as GenMood,
                       })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   >
                     {GEN_MOODS.map((m) => (
                       <option key={m} value={m}>
@@ -847,7 +874,7 @@ function App() {
                         recipient: e.target.value as GenRecipient,
                       })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   >
                     {GEN_RECIPIENTS.map((r) => (
                       <option key={r} value={r}>
@@ -869,7 +896,7 @@ function App() {
               {lastGenerated && (
                 <div
                   ref={generatedRef}
-                  className="fade-in mt-7 rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] to-white border border-[hsl(var(--border))] p-6 sm:p-7 text-center"
+                  className="fade-in mt-7 rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] to-[hsl(var(--card))] border border-[hsl(var(--border))] p-6 sm:p-7 text-center"
                 >
                   <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[hsl(var(--accent))] font-semibold mb-3">
                     <span className="h-px w-6 bg-[hsl(var(--accent))]" />
@@ -889,7 +916,7 @@ function App() {
                       onClick={() =>
                         copyText(`${lastGenerated.text}\n\n${SIGNATURE}`)
                       }
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                     >
                       <span aria-hidden>⧉</span>
                       Copiar
@@ -910,7 +937,7 @@ function App() {
                       className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition ${
                         isCustomFavorited
                           ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] border-transparent"
-                          : "bg-white border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                          : "bg-[hsl(var(--card))] border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
                       }`}
                     >
                       <span aria-hidden>{isCustomFavorited ? "♥" : "♡"}</span>
@@ -919,7 +946,7 @@ function App() {
                     <button
                       type="button"
                       onClick={regenerate}
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                       title="Gerar outra variação com os mesmos dados"
                     >
                       <span aria-hidden>↻</span>
@@ -944,7 +971,7 @@ function App() {
                     {customFavorites.map((g) => (
                       <li
                         key={g.id}
-                        className="rounded-xl border border-[hsl(var(--border))] bg-white p-4 text-left"
+                        className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-left"
                       >
                         <p className="font-serif text-base text-[hsl(var(--foreground))]">
                           “{g.text}”
@@ -996,7 +1023,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => setCreatorOpen(false)}
-                  className="inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                  className="inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                 >
                   <span aria-hidden>←</span>
                   Voltar para a home
@@ -1031,7 +1058,7 @@ function App() {
                 type="button"
                 aria-label="Fechar"
                 onClick={() => setViewerItem(null)}
-                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
+                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
               >
                 ×
               </button>
@@ -1059,7 +1086,7 @@ function App() {
                   onClick={() =>
                     shareText(`${viewerItem.text}\n\n${SIGNATURE}`)
                   }
-                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                 >
                   <span aria-hidden>↗</span>
                   Compartilhar
@@ -1067,7 +1094,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => setViewerItem(null)}
-                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                 >
                   Fechar
                 </button>

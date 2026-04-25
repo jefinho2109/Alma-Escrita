@@ -52,9 +52,33 @@
   --accent: 28 70% 60%;
   --accent-foreground: 0 0% 100%;
 
+  --bg-glow-1: 280 50% 95%;
+  --bg-glow-2: 28 60% 92%;
+
   --app-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --app-font-serif: 'Cormorant Garamond', Georgia, serif;
   --radius: 1rem;
+}
+
+.dark {
+  --background: 280 22% 10%;
+  --foreground: 36 30% 92%;
+  --border: 280 12% 22%;
+  --input: 280 12% 22%;
+  --ring: 280 50% 70%;
+  --card: 280 18% 15%;
+  --card-foreground: 36 30% 92%;
+  --primary: 280 55% 72%;
+  --primary-foreground: 280 22% 10%;
+  --secondary: 280 18% 18%;
+  --secondary-foreground: 36 30% 92%;
+  --muted: 280 14% 20%;
+  --muted-foreground: 36 12% 70%;
+  --accent: 28 65% 65%;
+  --accent-foreground: 280 22% 10%;
+
+  --bg-glow-1: 280 30% 18%;
+  --bg-glow-2: 28 25% 16%;
 }
 
 @layer base {
@@ -69,13 +93,14 @@
   body {
     font-family: var(--app-font-sans);
     background:
-      radial-gradient(ellipse at top, hsl(280 50% 95%) 0%, transparent 60%),
-      radial-gradient(ellipse at bottom right, hsl(28 60% 92%) 0%, transparent 50%),
+      radial-gradient(ellipse at top, hsl(var(--bg-glow-1)) 0%, transparent 60%),
+      radial-gradient(ellipse at bottom right, hsl(var(--bg-glow-2)) 0%, transparent 50%),
       hsl(var(--background));
     background-attachment: fixed;
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
@@ -98,7 +123,7 @@
   }
 
   .glass {
-    background: hsl(0 0% 100% / 0.7);
+    background: hsl(var(--card) / 0.7);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
