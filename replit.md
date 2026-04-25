@@ -4,6 +4,10 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+## Artifacts
+
+- **alma-escrita** (`/`) — "Alma Escrita": single-page React app with autoral messages by Jefferson Poeta Sonhador, organized by category and emotion. Pure frontend, persists favorites and last filter in `localStorage`. Includes a button linking to the external Alma Sonora app.
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
