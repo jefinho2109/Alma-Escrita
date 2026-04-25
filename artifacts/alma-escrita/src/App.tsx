@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
   MESSAGES,
@@ -8,6 +8,13 @@ import {
   type Message,
   type Mood,
 } from "@/data/messages";
+import {
+  GEN_MOODS,
+  GEN_RECIPIENTS,
+  generateMessage,
+  type GenMood,
+  type GenRecipient,
+} from "@/data/generator";
 
 const ALMA_SONORA_URL =
   "https://copyright-music-hub--jeffersondesign.replit.app";
@@ -15,11 +22,29 @@ const ALMA_SONORA_URL =
 const FAVORITES_KEY = "alma-escrita:favorites";
 const COPIED_KEY = "alma-escrita:last-copied";
 const FILTER_KEY = "alma-escrita:last-filter";
+const CUSTOM_FAVORITES_KEY = "alma-escrita:custom-favorites";
+const LAST_GENERATED_KEY = "alma-escrita:last-generated";
+const GEN_FORM_KEY = "alma-escrita:gen-form";
 
 type Filter =
   | { kind: "none" }
   | { kind: "category"; value: Category }
   | { kind: "mood"; value: Mood };
+
+interface GeneratedMessage {
+  id: string;
+  name: string;
+  mood: GenMood;
+  recipient: GenRecipient;
+  text: string;
+  createdAt: number;
+}
+
+interface GenForm {
+  name: string;
+  mood: GenMood;
+  recipient: GenRecipient;
+}
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [state, setState] = useState<T>(() => {
@@ -67,8 +92,19 @@ function App() {
     COPIED_KEY,
     null,
   );
+  const [genForm, setGenForm] = useLocalStorageState<GenForm>(GEN_FORM_KEY, {
+    name: "",
+    mood: "feliz",
+    recipient: "amor",
+  });
+  const [lastGenerated, setLastGenerated] =
+    useLocalStorageState<GeneratedMessage | null>(LAST_GENERATED_KEY, null);
+  const [customFavorites, setCustomFavorites] = useLocalStorageState<
+    GeneratedMessage[]
+  >(CUSTOM_FAVORITES_KEY, []);
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
+  const generatedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -97,6 +133,13 @@ function App() {
         ? `Para quem se sente ${filter.value.toLowerCase()}`
         : "Todas as mensagens";
 
+  function copyText(text: string, okMsg = "Mensagem copiada com carinho ✦") {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => setToast(okMsg))
+      .catch(() => setToast("Não consegui copiar. Tente novamente."));
+  }
+
   function handleCopy(m: Message) {
     const full = `${m.text}\n\n${SIGNATURE}`;
     navigator.clipboard
@@ -110,21 +153,27 @@ function App() {
 
   async function handleShare(m: Message) {
     const full = `${m.text}\n\n${SIGNATURE}`;
+    await shareText(full);
+  }
+
+  async function shareText(text: string) {
     const nav = navigator as Navigator & {
       share?: (data: ShareData) => Promise<void>;
     };
     if (nav.share) {
       try {
-        await nav.share({
-          title: "Alma Escrita",
-          text: full,
-        });
+        await nav.share({ title: "Alma Escrita", text });
         return;
       } catch {
-        /* user cancelled or unsupported, fall back */
+        /* fall back to whatsapp */
       }
     }
-    const url = `https://wa.me/?text=${encodeURIComponent(full)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function shareWhatsApp(text: string) {
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -137,6 +186,68 @@ function App() {
   function clearFilter() {
     setFilter({ kind: "none" });
     setShowFavorites(false);
+  }
+
+  function handleGenerate(e: React.FormEvent) {
+    e.preventDefault();
+    const text = generateMessage(genForm.name, genForm.mood, genForm.recipient);
+    const generated: GeneratedMessage = {
+      id: `gen-${Date.now()}`,
+      name: genForm.name.trim(),
+      mood: genForm.mood,
+      recipient: genForm.recipient,
+      text,
+      createdAt: Date.now(),
+    };
+    setLastGenerated(generated);
+    setToast("Mensagem criada com carinho ✨");
+    requestAnimationFrame(() => {
+      generatedRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }
+
+  function regenerate() {
+    if (!lastGenerated) return;
+    const text = generateMessage(
+      lastGenerated.name,
+      lastGenerated.mood,
+      lastGenerated.recipient,
+    );
+    setLastGenerated({ ...lastGenerated, text, createdAt: Date.now() });
+  }
+
+  const isCustomFavorited =
+    !!lastGenerated &&
+    customFavorites.some(
+      (g) =>
+        g.text === lastGenerated.text &&
+        g.name === lastGenerated.name &&
+        g.mood === lastGenerated.mood &&
+        g.recipient === lastGenerated.recipient,
+    );
+
+  function toggleCustomFavorite() {
+    if (!lastGenerated) return;
+    if (isCustomFavorited) {
+      setCustomFavorites((prev) =>
+        prev.filter(
+          (g) =>
+            !(
+              g.text === lastGenerated.text &&
+              g.name === lastGenerated.name &&
+              g.mood === lastGenerated.mood &&
+              g.recipient === lastGenerated.recipient
+            ),
+        ),
+      );
+      setToast("Removida dos favoritos");
+    } else {
+      setCustomFavorites((prev) => [lastGenerated, ...prev].slice(0, 50));
+      setToast("Salva nos seus favoritos ♥");
+    }
   }
 
   return (
@@ -186,8 +297,229 @@ function App() {
       </header>
 
       <main className="px-5 sm:px-8 pb-16 max-w-5xl w-full mx-auto flex-1">
+        {/* Personalized message generator */}
+        <section className="mt-2">
+          <div className="rounded-3xl p-[1.5px] bg-gradient-to-br from-[hsl(var(--primary))] via-[hsl(var(--accent))] to-[hsl(var(--primary))] shadow-lg shadow-[hsl(var(--primary)/0.15)]">
+            <div className="rounded-3xl bg-white/90 glass p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-5">
+                <div>
+                  <h2 className="font-serif text-2xl sm:text-3xl text-[hsl(var(--primary))] flex items-center gap-2">
+                    <span aria-hidden>✨</span> Criar mensagem personalizada
+                  </h2>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                    Conte um pouco sobre você — eu escrevo uma mensagem feita só
+                    pra esse momento.
+                  </p>
+                </div>
+              </div>
+
+              <form
+                onSubmit={handleGenerate}
+                className="grid gap-4 sm:grid-cols-3"
+              >
+                <label className="flex flex-col gap-1.5 sm:col-span-3 md:col-span-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Nome da pessoa
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="text"
+                    autoComplete="off"
+                    placeholder="Ex.: GT"
+                    value={genForm.name}
+                    onChange={(e) =>
+                      setGenForm({ ...genForm, name: e.target.value })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Como você está se sentindo?
+                  </span>
+                  <select
+                    value={genForm.mood}
+                    onChange={(e) =>
+                      setGenForm({
+                        ...genForm,
+                        mood: e.target.value as GenMood,
+                      })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  >
+                    {GEN_MOODS.map((m) => (
+                      <option key={m} value={m}>
+                        {m.charAt(0).toUpperCase() + m.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Para quem é a mensagem?
+                  </span>
+                  <select
+                    value={genForm.recipient}
+                    onChange={(e) =>
+                      setGenForm({
+                        ...genForm,
+                        recipient: e.target.value as GenRecipient,
+                      })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-white focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  >
+                    {GEN_RECIPIENTS.map((r) => (
+                      <option key={r} value={r}>
+                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="sm:col-span-3 flex justify-center sm:justify-end">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium shadow-lg shadow-[hsl(var(--primary)/0.25)] hover:opacity-90 transition"
+                  >
+                    <span aria-hidden>✦</span>
+                    Gerar mensagem
+                  </button>
+                </div>
+              </form>
+
+              {lastGenerated && (
+                <div
+                  ref={generatedRef}
+                  className="fade-in mt-7 rounded-2xl bg-gradient-to-br from-[hsl(var(--secondary))] to-white border border-[hsl(var(--border))] p-6 sm:p-8 text-center"
+                >
+                  <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[hsl(var(--accent))] font-semibold mb-3">
+                    <span className="h-px w-6 bg-[hsl(var(--accent))]" />
+                    Sua mensagem
+                    <span className="h-px w-6 bg-[hsl(var(--accent))]" />
+                  </div>
+                  <p className="font-serif text-xl sm:text-2xl leading-relaxed text-[hsl(var(--foreground))] text-balance">
+                    “{lastGenerated.text}”
+                  </p>
+                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
+                    {SIGNATURE}
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyText(`${lastGenerated.text}\n\n${SIGNATURE}`)
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                    >
+                      <span aria-hidden>⧉</span>
+                      Copiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        shareWhatsApp(`${lastGenerated.text}\n\n${SIGNATURE}`)
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-[#25D366] text-white hover:opacity-90 transition"
+                    >
+                      <span aria-hidden>✆</span>
+                      WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleCustomFavorite}
+                      className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition ${
+                        isCustomFavorited
+                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] border-transparent"
+                          : "bg-white border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                      }`}
+                    >
+                      <span aria-hidden>{isCustomFavorited ? "♥" : "♡"}</span>
+                      {isCustomFavorited ? "Favoritada" : "Favoritar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={regenerate}
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-white hover:bg-[hsl(var(--muted))] transition"
+                      title="Gerar outra variação com os mesmos dados"
+                    >
+                      <span aria-hidden>↻</span>
+                      Outra
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {customFavorites.length > 0 && (
+                <details className="mt-6 group">
+                  <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-[hsl(var(--primary))] hover:underline">
+                    <span>
+                      Suas mensagens personalizadas salvas (
+                      {customFavorites.length})
+                    </span>
+                    <span aria-hidden className="transition group-open:rotate-180">
+                      ⌄
+                    </span>
+                  </summary>
+                  <ul className="mt-4 grid gap-3">
+                    {customFavorites.map((g) => (
+                      <li
+                        key={g.id}
+                        className="rounded-xl border border-[hsl(var(--border))] bg-white p-4 text-left"
+                      >
+                        <p className="font-serif text-base text-[hsl(var(--foreground))]">
+                          “{g.text}”
+                        </p>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                            {g.mood} · {g.recipient}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyText(`${g.text}\n\n${SIGNATURE}`)
+                              }
+                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                            >
+                              Copiar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                shareWhatsApp(`${g.text}\n\n${SIGNATURE}`)
+                              }
+                              className="text-xs font-medium px-3 py-1.5 rounded-full bg-[#25D366] text-white hover:opacity-90"
+                            >
+                              WhatsApp
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Remover dos favoritos"
+                              onClick={() =>
+                                setCustomFavorites((prev) =>
+                                  prev.filter((x) => x.id !== g.id),
+                                )
+                              }
+                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* Categories */}
-        <section className="mt-4">
+        <section className="mt-10">
           <h2 className="font-serif text-2xl text-[hsl(var(--foreground))] mb-4">
             Categorias
           </h2>
@@ -369,7 +701,7 @@ function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-full bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-xl text-sm fade-in"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-full bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-xl text-sm fade-in z-50"
         >
           {toast}
         </div>
