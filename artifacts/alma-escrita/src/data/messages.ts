@@ -500,4 +500,209 @@ export const MESSAGES: Message[] = [
     text:
       "José foi vendido pelos irmãos, esquecido na prisão, e ainda assim governou o Egito. O seu recomeço também tem propósito — confie.",
   },
+
+  // === Histórias reais de superação — FFP (lote 2) ===
+
+  {
+    id: "fe-10",
+    category: "Fé",
+    moods: ["Sem força", "Triste"],
+    text:
+      "Já perdi quase tudo. Mas a fé eu nunca soltei. E foi ela que segurou a minha mão quando até a esperança me soltou.",
+  },
+  {
+    id: "fe-11",
+    category: "Fé",
+    moods: ["Ansioso", "Grato"],
+    text:
+      "Deus não promete um caminho sem espinhos. Promete sandálias firmes para atravessar o deserto sem desistir.",
+  },
+  {
+    id: "fe-12",
+    category: "Fé",
+    moods: ["Sem força"],
+    text:
+      "Quando o joelho dobra de cansaço, é porque ainda dá para orar. E quem ora, nunca está só.",
+  },
+  {
+    id: "fe-13",
+    category: "Fé",
+    moods: ["Triste", "Ansioso"],
+    text:
+      "Tem milagre que vem em silêncio. Continua firme — Deus está trabalhando no que os seus olhos ainda não veem.",
+  },
+
+  {
+    id: "motivacao-9",
+    category: "Motivação",
+    moods: ["Sem força"],
+    text:
+      "A dor que te derruba hoje é a mesma que te ensina a levantar amanhã com mais propósito.",
+  },
+  {
+    id: "motivacao-10",
+    category: "Motivação",
+    moods: ["Sem força", "Ansioso"],
+    text:
+      "Não desista no último quilômetro. Muita gente largou a corrida bem perto da linha de chegada — não seja você.",
+  },
+  {
+    id: "motivacao-11",
+    category: "Motivação",
+    moods: ["Grato", "Feliz"],
+    text:
+      "Coragem é seguir mesmo com o coração apertado. E você tem mais coragem do que imagina — só precisa lembrar disso.",
+  },
+  {
+    id: "motivacao-12",
+    category: "Motivação",
+    moods: ["Sem força"],
+    text:
+      "Fé para começar. Força para continuar. Paciência para esperar o tempo de Deus. FFP é o caminho.",
+  },
+
+  {
+    id: "superacao-9",
+    category: "Superação",
+    moods: ["Triste", "Sem força"],
+    text:
+      "Já chorei tanto que pensei que ia secar. Mas Deus secou as lágrimas e regou de novo a minha esperança. Ele faz isso com você também.",
+  },
+  {
+    id: "superacao-10",
+    category: "Superação",
+    moods: ["Sem força"],
+    text:
+      "Nenhuma doença, nenhuma perda, nenhum recomeço é maior do que o Deus que vive em você.",
+  },
+  {
+    id: "superacao-11",
+    category: "Superação",
+    moods: ["Triste"],
+    text:
+      "A vida me ensinou que cair não é o fim — é só o começo da história que vai inspirar alguém amanhã.",
+  },
+  {
+    id: "superacao-12",
+    category: "Superação",
+    moods: ["Sem força", "Grato"],
+    text:
+      "Deus não desperdiça dor. Tudo o que você atravessou está virando combustível para o propósito que vem aí.",
+  },
+  {
+    id: "superacao-13",
+    category: "Superação",
+    moods: ["Ansioso"],
+    text:
+      "Quem aprende com a dor vira testemunho. Quem foge dela, repete o capítulo. Encare — você é mais forte do que pensa.",
+  },
+
+  {
+    id: "tristeza-8",
+    category: "Tristeza",
+    moods: ["Triste"],
+    text:
+      "Tem dias que a alma só quer silêncio. Tudo bem. Deus entende o que a boca não consegue explicar.",
+  },
+  {
+    id: "tristeza-9",
+    category: "Tristeza",
+    moods: ["Triste", "Sem força"],
+    text:
+      "A perda dói porque o amor foi verdadeiro. E o que é verdadeiro, nem o tempo apaga — só ensina a carregar com mais leveza.",
+  },
+  {
+    id: "tristeza-10",
+    category: "Tristeza",
+    moods: ["Sem força"],
+    text:
+      "Chora se precisar. A lágrima também é oração. E nenhuma oração feita do fundo da alma volta vazia.",
+  },
+
+  {
+    id: "amor-8",
+    category: "Amor",
+    moods: ["Apaixonado", "Grato"],
+    text:
+      "Amar é cuidar até quando dói. É escolher a mesma pessoa, todos os dias, mesmo sabendo de tudo o que ela é — e ainda assim querê-la inteira.",
+  },
+  {
+    id: "amor-9",
+    category: "Amor",
+    moods: ["Apaixonado"],
+    text:
+      "O verdadeiro amor não pede para você se diminuir. Ele te empurra para cima, segura sua mão e caminha junto.",
+  },
+  {
+    id: "amor-10",
+    category: "Amor",
+    moods: ["Grato"],
+    text:
+      "Tem amores que Deus envia em forma de cura. Quando reconhecer um desses, agradeça e cuida com a vida.",
+  },
+
+  {
+    id: "gratidao-8",
+    category: "Gratidão",
+    moods: ["Grato"],
+    text:
+      "Obrigado, Senhor, por mais um respiro. Mais um sorriso. Mais uma chance de fazer diferente. A vida cabe nos detalhes.",
+  },
+  {
+    id: "gratidao-9",
+    category: "Gratidão",
+    moods: ["Grato", "Sem força"],
+    text:
+      "Já passei por noites em que dormir era um milagre. Hoje agradeço cada amanhecer como quem recebe presente novo.",
+  },
+  {
+    id: "gratidao-10",
+    category: "Gratidão",
+    moods: ["Grato", "Feliz"],
+    text:
+      "A gratidão é a oração mais curta e mais poderosa que existe. Cabe num 'obrigado' e move o céu inteiro.",
+  },
+  {
+    id: "gratidao-11",
+    category: "Gratidão",
+    moods: ["Grato"],
+    text:
+      "Sou grato pelas portas que se fecharam. Foram elas que me empurraram para as que Deus tinha preparado de verdade.",
+  },
+
+  {
+    id: "recomeco-8",
+    category: "Recomeço",
+    moods: ["Sem força", "Grato"],
+    text:
+      "Recomeçar é dizer 'sim' à vida mais uma vez, mesmo com as mãos trêmulas. E é exatamente assim que nascem as vitórias mais bonitas.",
+  },
+  {
+    id: "recomeco-9",
+    category: "Recomeço",
+    moods: ["Triste", "Sem força"],
+    text:
+      "Nenhum recomeço é tarde demais aos olhos de Deus. Enquanto há fôlego, há propósito esperando por você.",
+  },
+  {
+    id: "recomeco-10",
+    category: "Recomeço",
+    moods: ["Ansioso"],
+    text:
+      "A dor não veio para ficar. Ela veio te ensinar a recomeçar com mais sabedoria, mais fé e menos pressa.",
+  },
+  {
+    id: "recomeco-11",
+    category: "Recomeço",
+    moods: ["Sem força"],
+    text:
+      "Se um capítulo terminou em lágrimas, deixa Deus escrever o próximo. Os dele costumam terminar em testemunho.",
+  },
+  {
+    id: "recomeco-12",
+    category: "Recomeço",
+    moods: ["Grato", "Feliz"],
+    text:
+      "Recomeçar faz parte da vitória. Ninguém constrói algo bonito sem antes derrubar o que já não servia.",
+  },
 ];
