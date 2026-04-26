@@ -192,6 +192,8 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>("home");
   const [viewerItem, setViewerItem] = useState<RecentItem | null>(null);
   const generatedRef = useRef<HTMLDivElement | null>(null);
 
@@ -265,6 +267,46 @@ function App() {
       window.removeEventListener("keydown", onKey);
     };
   }, [creatorOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const ids = ["section-daily", "section-impact", "section-categories"];
+    const sections = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (sections.length === 0) return;
+
+    function onScroll() {
+      const y = window.scrollY;
+      if (y < 80) {
+        setActiveSection("home");
+        return;
+      }
+      let current = "home";
+      const offset = 120;
+      for (const sec of sections) {
+        const top = sec.getBoundingClientRect().top + window.scrollY;
+        if (y + offset >= top) current = sec.id;
+      }
+      setActiveSection(current);
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const filtered: Message[] = useMemo(() => {
     if (showFavorites) {
@@ -438,6 +480,19 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col relative">
+      {/* Hamburger menu trigger */}
+      <button
+        type="button"
+        onClick={() => setMenuOpen(true)}
+        aria-label="Abrir menu"
+        aria-expanded={menuOpen}
+        aria-controls="side-menu"
+        title="Menu"
+        className="fixed top-4 left-4 sm:top-5 sm:left-5 z-40 h-10 w-10 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.85)] backdrop-blur hover:bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-md flex items-center justify-center transition"
+      >
+        <span aria-hidden className="text-lg leading-none">☰</span>
+      </button>
+
       {/* Theme toggle */}
       <button
         type="button"
@@ -454,6 +509,177 @@ function App() {
           {theme === "dark" ? "☀" : "☾"}
         </span>
       </button>
+
+      {/* Side menu (drawer) */}
+      <div
+        className={`fixed inset-0 z-50 transition-opacity duration-300 ${
+          menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!menuOpen}
+      >
+        <div
+          className="absolute inset-0 bg-[hsl(220_40%_8%/0.55)] backdrop-blur-sm"
+          onClick={() => setMenuOpen(false)}
+        />
+        <aside
+          id="side-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu de navegação"
+          className={`absolute left-0 top-0 h-full w-[82%] max-w-xs bg-[hsl(var(--card))] shadow-2xl shadow-[hsl(215_70%_15%/0.35)] border-r border-[hsl(var(--border))] flex flex-col transform transition-transform duration-300 ease-out ${
+            menuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[hsl(var(--border))]">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-[hsl(var(--muted-foreground))]">
+                Menu
+              </p>
+              <p className="font-serif text-xl text-[hsl(var(--primary))] leading-tight">
+                Alma Escrita
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              aria-label="Fechar menu"
+              className="h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] flex items-center justify-center transition"
+            >
+              <span aria-hidden className="text-lg leading-none">✕</span>
+            </button>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto py-3">
+            {(() => {
+              type MenuItem = {
+                key: string;
+                label: string;
+                icon: string;
+                onClick: () => void;
+                active?: boolean;
+              };
+              function go(id: string) {
+                setMenuOpen(false);
+                requestAnimationFrame(() => {
+                  if (id === "home") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  } else {
+                    document
+                      .getElementById(id)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                });
+              }
+              const items: MenuItem[] = [
+                {
+                  key: "home",
+                  label: "Home",
+                  icon: "⌂",
+                  active: activeSection === "home",
+                  onClick: () => go("home"),
+                },
+                {
+                  key: "section-categories",
+                  label: "Categorias",
+                  icon: "▦",
+                  active: activeSection === "section-categories",
+                  onClick: () => go("section-categories"),
+                },
+                {
+                  key: "section-daily",
+                  label: "Mensagem para este momento",
+                  icon: "✦",
+                  active: activeSection === "section-daily",
+                  onClick: () => go("section-daily"),
+                },
+                {
+                  key: "section-impact",
+                  label: "Frases de Impacto",
+                  icon: "🔑",
+                  active: activeSection === "section-impact",
+                  onClick: () => go("section-impact"),
+                },
+                {
+                  key: "favorites",
+                  label: "Favoritas",
+                  icon: "♥",
+                  onClick: () => {
+                    setShowFavorites(true);
+                    setFilter({ kind: "none" });
+                    setMenuOpen(false);
+                    requestAnimationFrame(() => {
+                      document
+                        .getElementById("section-messages")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                  },
+                },
+                {
+                  key: "creator",
+                  label: "Criar mensagem personalizada",
+                  icon: "✨",
+                  onClick: () => {
+                    setMenuOpen(false);
+                    setCreatorOpen(true);
+                  },
+                },
+                {
+                  key: "alma-sonora",
+                  label: "Acessar Alma Sonora",
+                  icon: "🎧",
+                  onClick: () => {
+                    setMenuOpen(false);
+                    window.open(ALMA_SONORA_URL, "_blank", "noopener,noreferrer");
+                  },
+                },
+              ];
+              return (
+                <ul className="px-2">
+                  {items.map((it) => (
+                    <li key={it.key}>
+                      <button
+                        type="button"
+                        onClick={it.onClick}
+                        className={`w-full text-left flex items-center gap-3 px-3 py-3 rounded-xl transition ${
+                          it.active
+                            ? "bg-gradient-to-r from-[hsl(var(--primary)/0.12)] to-[hsl(var(--accent)/0.10)] text-[hsl(var(--primary))] font-semibold"
+                            : "text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+                        }`}
+                      >
+                        <span
+                          aria-hidden
+                          className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center text-sm ${
+                            it.active
+                              ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                              : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]"
+                          }`}
+                        >
+                          {it.icon}
+                        </span>
+                        <span className="font-serif text-base sm:text-[1.05rem] leading-snug">
+                          {it.label}
+                        </span>
+                        {it.active && (
+                          <span
+                            aria-hidden
+                            className="ml-auto h-2 w-2 rounded-full bg-[hsl(var(--accent))]"
+                          />
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </nav>
+
+          <div className="px-5 py-4 border-t border-[hsl(var(--border))] text-center">
+            <p className="font-serif italic text-sm text-[hsl(var(--muted-foreground))]">
+              — Jefferson Poeta Sonhador
+            </p>
+          </div>
+        </aside>
+      </div>
 
       {/* Header / Hero */}
       <header className="px-5 sm:px-8 pt-10 sm:pt-16 pb-6 max-w-5xl w-full mx-auto text-center">
@@ -501,7 +727,7 @@ function App() {
 
       <main className="px-5 sm:px-8 pb-16 max-w-5xl w-full mx-auto flex-1">
         {/* Daily message */}
-        <section className="mt-2 mb-6" aria-labelledby="daily-title">
+        <section id="section-daily" className="mt-2 mb-6 scroll-mt-24" aria-labelledby="daily-title">
           <article className="feature-card rounded-2xl p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2
@@ -579,7 +805,7 @@ function App() {
         </section>
 
         {/* Frases de Impacto do Poeta Sonhador */}
-        <section className="mt-8" aria-labelledby="impact-title">
+        <section id="section-impact" className="mt-8 scroll-mt-24" aria-labelledby="impact-title">
           <div className="flex items-end justify-between gap-3 mb-4">
             <div>
               <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] impact-section-title font-semibold mb-1">
@@ -739,7 +965,7 @@ function App() {
         )}
 
         {/* Categories */}
-        <section className="mt-10">
+        <section id="section-categories" className="mt-10 scroll-mt-24">
           <h2 className="font-serif text-2xl text-[hsl(var(--foreground))] mb-4">
             Categorias
           </h2>
@@ -832,7 +1058,7 @@ function App() {
         )}
 
         {/* Messages */}
-        <section className="mt-6">
+        <section id="section-messages" className="mt-6 scroll-mt-24">
           <h3 className="font-serif text-xl text-[hsl(var(--foreground))] mb-4">
             {heading}
           </h3>
