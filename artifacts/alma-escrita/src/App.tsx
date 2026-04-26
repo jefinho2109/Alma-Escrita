@@ -112,6 +112,26 @@ function hashString(s: string): number {
   return h >>> 0;
 }
 
+function greetingForHour(h: number): "Bom dia" | "Boa tarde" | "Boa noite" {
+  if (h >= 5 && h < 12) return "Bom dia";
+  if (h >= 12 && h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+function currentGreeting(d = new Date()): "Bom dia" | "Boa tarde" | "Boa noite" {
+  return greetingForHour(d.getHours());
+}
+
+function stripLeadingGreeting(text: string): string {
+  const re = /^(bom dia|boa tarde|boa noite)[\s,!.\-—:]+/i;
+  return text.replace(re, "");
+}
+
+function applyGreeting(greeting: string, text: string): string {
+  const cleaned = stripLeadingGreeting(text);
+  return `${greeting}, ${cleaned.charAt(0).toLowerCase()}${cleaned.slice(1)}`;
+}
+
 function pickDaily(dateKey: string): Message {
   const idx = hashString(dateKey) % MESSAGES.length;
   return MESSAGES[idx];
@@ -163,6 +183,9 @@ function App() {
     messageId: string;
   } | null>(DAILY_KEY, null);
   const [todayStr, setTodayStr] = useState<string>(() => todayKey());
+  const [greeting, setGreeting] = useState<"Bom dia" | "Boa tarde" | "Boa noite">(
+    () => currentGreeting()
+  );
   const [theme, setTheme] = useLocalStorageState<Theme>(THEME_KEY, "light");
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
@@ -194,6 +217,8 @@ function App() {
       if (document.visibilityState === "visible") {
         const now = todayKey();
         setTodayStr((prev) => (prev === now ? prev : now));
+        const g = currentGreeting();
+        setGreeting((prev) => (prev === g ? prev : g));
       }
     }
     document.addEventListener("visibilitychange", onVisible);
@@ -201,6 +226,14 @@ function App() {
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const g = currentGreeting();
+      setGreeting((prev) => (prev === g ? prev : g));
+    }, 60_000);
+    return () => window.clearInterval(id);
   }, []);
 
   const dailyMessage: Message = useMemo(() => {
@@ -472,7 +505,7 @@ function App() {
                 className="inline-flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-[0.25em] feature-fg font-semibold"
               >
                 <span className="h-px w-5 feature-divider" />
-                Mensagem do dia
+                Mensagem para este momento
                 <span className="h-px w-5 feature-divider" />
               </h2>
               <span className="text-[10px] uppercase tracking-wider feature-fg-soft">
@@ -480,7 +513,7 @@ function App() {
               </span>
             </div>
             <p className="font-serif text-base sm:text-lg leading-relaxed feature-fg text-center text-balance">
-              “{dailyMessage.text}”
+              “{applyGreeting(greeting, dailyMessage.text)}”
             </p>
             <p className="font-serif italic text-sm feature-fg-soft mt-3 text-center">
               {SIGNATURE}
@@ -488,7 +521,12 @@ function App() {
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => handleCopy(dailyMessage)}
+                onClick={() =>
+                  handleCopy({
+                    ...dailyMessage,
+                    text: applyGreeting(greeting, dailyMessage.text),
+                  })
+                }
                 className="btn-soft inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full"
               >
                 <span aria-hidden>⧉</span>
@@ -496,7 +534,12 @@ function App() {
               </button>
               <button
                 type="button"
-                onClick={() => handleShare(dailyMessage)}
+                onClick={() =>
+                  handleShare({
+                    ...dailyMessage,
+                    text: applyGreeting(greeting, dailyMessage.text),
+                  })
+                }
                 className="btn-soft inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full"
               >
                 <span aria-hidden>↗</span>
