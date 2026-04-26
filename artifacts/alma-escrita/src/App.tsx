@@ -127,6 +127,8 @@ function categoryEmoji(c: Category): string {
     case "Amizade": return "✿";
     case "Bom dia": return "☀";
     case "Boa noite": return "☾";
+    case "Gratidão": return "✺";
+    case "Recomeço": return "❖";
   }
 }
 
