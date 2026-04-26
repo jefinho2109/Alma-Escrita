@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
+  IMPACT_QUOTES,
   MESSAGES,
   MOODS,
   SIGNATURE,
@@ -149,6 +150,7 @@ function categoryEmoji(c: Category): string {
     case "Boa noite": return "☾";
     case "Gratidão": return "✺";
     case "Recomeço": return "❖";
+    case "Impacto": return "🔑";
   }
 }
 
@@ -266,7 +268,9 @@ function App() {
 
   const filtered: Message[] = useMemo(() => {
     if (showFavorites) {
-      return MESSAGES.filter((m) => favorites.includes(m.id));
+      const favSet = new Set(favorites);
+      const all = [...MESSAGES, ...IMPACT_QUOTES];
+      return all.filter((m) => favSet.has(m.id));
     }
     if (filter.kind === "category") {
       return MESSAGES.filter((m) => m.category === filter.value);
@@ -572,6 +576,92 @@ function App() {
               <span aria-hidden>→</span>
             </span>
           </button>
+        </section>
+
+        {/* Frases de Impacto do Poeta Sonhador */}
+        <section className="mt-8" aria-labelledby="impact-title">
+          <div className="flex items-end justify-between gap-3 mb-4">
+            <div>
+              <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] impact-section-title font-semibold mb-1">
+                Seção especial
+              </p>
+              <h2
+                id="impact-title"
+                className="font-serif text-2xl sm:text-3xl text-[hsl(var(--foreground))] leading-tight"
+              >
+                <span aria-hidden>🔑</span>{" "}
+                Frases de Impacto do{" "}
+                <span className="impact-section-title font-semibold">
+                  Poeta Sonhador
+                </span>
+              </h2>
+              <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1 max-w-prose">
+                Pensamentos curtos, profundos e marcantes — para guardar no peito.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            {IMPACT_QUOTES.map((q) => {
+              const fav = favorites.includes(q.id);
+              return (
+                <article
+                  key={q.id}
+                  className="impact-card fade-in relative rounded-2xl p-6 sm:p-7 transition hover:-translate-y-0.5"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] impact-accent font-semibold">
+                      <span aria-hidden>🔑</span>
+                      Frase de Impacto
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={
+                        fav
+                          ? "Remover dos favoritos"
+                          : "Adicionar aos favoritos"
+                      }
+                      onClick={() => toggleFavorite(q.id)}
+                      className={`text-xl leading-none transition ${
+                        fav ? "impact-accent" : "impact-fg-soft hover:impact-accent"
+                      }`}
+                    >
+                      {fav ? "♥" : "♡"}
+                    </button>
+                  </div>
+
+                  <p className="font-serif text-[1.2rem] sm:text-[1.3rem] leading-relaxed impact-fg text-balance relative z-10">
+                    <span className="impact-accent text-2xl leading-none mr-1" aria-hidden>“</span>
+                    {q.text}
+                    <span className="impact-accent text-2xl leading-none ml-1" aria-hidden>”</span>
+                  </p>
+
+                  <p className="font-serif italic impact-fg-soft mt-4 relative z-10">
+                    {SIGNATURE}
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap gap-2 relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(q)}
+                      className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
+                    >
+                      <span aria-hidden>⧉</span>
+                      Copiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleShare(q)}
+                      className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
+                    >
+                      <span aria-hidden>↗</span>
+                      Compartilhar
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </section>
 
         {/* Recent messages */}

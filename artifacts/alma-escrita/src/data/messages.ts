@@ -8,7 +8,8 @@ export type Category =
   | "Bom dia"
   | "Boa noite"
   | "Gratidão"
-  | "Recomeço";
+  | "Recomeço"
+  | "Impacto";
 
 export type Mood =
   | "Feliz"
@@ -704,5 +705,81 @@ export const MESSAGES: Message[] = [
     moods: ["Grato", "Feliz"],
     text:
       "Recomeçar faz parte da vitória. Ninguém constrói algo bonito sem antes derrubar o que já não servia.",
+  },
+];
+
+// === Frases de Impacto do Poeta Sonhador ===
+// Conteúdo fixo, em destaque. Não entra no catálogo geral.
+
+export const IMPACT_QUOTES: Message[] = [
+  {
+    id: "imp-1",
+    category: "Impacto",
+    moods: ["Sem força", "Grato"],
+    text:
+      "Não foi a força que me sustentou. Foi a fé que me carregou quando até a força me abandonou.",
+  },
+  {
+    id: "imp-2",
+    category: "Impacto",
+    moods: ["Triste", "Sem força"],
+    text:
+      "Deus não desperdiça dor. Tudo o que parece perda é matéria-prima para o seu próximo milagre.",
+  },
+  {
+    id: "imp-3",
+    category: "Impacto",
+    moods: ["Sem força"],
+    text:
+      "Recomeçar faz parte da vitória. Ninguém vence sem antes ter o coração reescrito pela coragem.",
+  },
+  {
+    id: "imp-4",
+    category: "Impacto",
+    moods: ["Triste", "Grato"],
+    text:
+      "A dor ensina o que o conforto nunca teria coragem de explicar.",
+  },
+  {
+    id: "imp-5",
+    category: "Impacto",
+    moods: ["Sem força", "Ansioso"],
+    text:
+      "Já perdi tudo. Menos a fé. E foi exatamente ela que me devolveu o resto.",
+  },
+  {
+    id: "imp-6",
+    category: "Impacto",
+    moods: ["Grato", "Feliz"],
+    text:
+      "Fé, Força e Paciência. Três pilares para quem se recusa a desabar diante da vida.",
+  },
+  {
+    id: "imp-7",
+    category: "Impacto",
+    moods: ["Sem força", "Triste"],
+    text:
+      "Quem chora sabendo de Quem é, chora menos. Porque a lágrima do filho de Deus nunca cai sozinha.",
+  },
+  {
+    id: "imp-8",
+    category: "Impacto",
+    moods: ["Ansioso"],
+    text:
+      "O que parecia o fim era só Deus virando a página para um capítulo maior.",
+  },
+  {
+    id: "imp-9",
+    category: "Impacto",
+    moods: ["Grato"],
+    text:
+      "A vida não me deu o que eu queria. Me deu o que eu precisava para virar quem eu sou hoje.",
+  },
+  {
+    id: "imp-10",
+    category: "Impacto",
+    moods: ["Sem força"],
+    text:
+      "Onde o mundo viu queda, Deus viu raiz. Foi no chão que Ele me ensinou a crescer de verdade.",
   },
 ];
