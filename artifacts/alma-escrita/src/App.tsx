@@ -370,18 +370,21 @@ function App() {
   }
 
   async function shareText(text: string) {
+    const footer =
+      "Leia mais no app Alma Escrita:\nhttps://alma-escrita--contatolojabigs.replit.app";
+    const full = `${text}\n\n${footer}`;
     const nav = navigator as Navigator & {
       share?: (data: ShareData) => Promise<void>;
     };
     if (nav.share) {
       try {
-        await nav.share({ title: "Alma Escrita", text });
+        await nav.share({ title: "Alma Escrita", text: full });
         return;
       } catch {
         /* fall back to whatsapp */
       }
     }
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(full)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
