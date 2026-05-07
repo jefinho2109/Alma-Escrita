@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Alma Escrita"
+version = "1.0.0"
+id = "artifacts/alma-escrita"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23275
+
+[services.development]
+run = "pnpm --filter @workspace/alma-escrita run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/alma-escrita", "run", "build" ]
+publicDir = "artifacts/alma-escrita/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23275"
+BASE_PATH = "/"
