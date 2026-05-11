@@ -20,8 +20,7 @@ import {
 } from "@/data/generator";
 
 const ALMA_SONORA_URL =
-  "https://copyright-music-hub--jeffersondesign.replit.app";
-
+  "https://alma-sonora-2kt8xmo83-jefinho2109s-projects.vercel.app";
 const SHARE_SIGNATURE = "— Alma Escrita";
 
 const FAVORITES_KEY = "alma-escrita:favorites";
