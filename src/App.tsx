@@ -20,9 +20,7 @@ import {
 } from "@/data/generator";
 
 const ALMA_SONORA_URL =
-  "https://alma-sonora-2kt8xmo83-jefinho2109s-projects.vercel.app";
-const SHARE_SIGNATURE = "— Alma Escrita";
-
+  "https://alma-sonora.vercel.app/";
 const FAVORITES_KEY = "alma-escrita:favorites";
 const COPIED_KEY = "alma-escrita:last-copied";
 const FILTER_KEY = "alma-escrita:last-filter";
