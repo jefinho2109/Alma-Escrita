@@ -1,10 +1,10 @@
 {
   "name": "@workspace/alma-escrita",
   "version": "0.0.0",
-"engines": {
-  "node": "20.x"
-},
-  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": "20.x"
+  },  "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
