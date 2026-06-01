@@ -151,6 +151,11 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
+function isShareAbort(error: unknown): boolean {
+  return error instanceof DOMException &&
+    (error.name === "AbortError" || error.name === "NotAllowedError");
+}
+
 export default function ImageCreator({ text }: ImageCreatorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textFrameRef = useRef<HTMLDivElement | null>(null);
@@ -408,8 +413,10 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
     const nav = navigator as Navigator & {
       canShare?: (data: ShareData) => boolean;
     };
+    const canShareFile =
+      Boolean(nav.share) && (!nav.canShare || nav.canShare({ files: [file] }));
 
-    if (nav.share && (!nav.canShare || nav.canShare({ files: [file] }))) {
+    if (canShareFile) {
       try {
         await nav.share({
           title: "Alma Escrita",
@@ -420,31 +427,33 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
         return;
       } catch (error) {
         console.warn("Compartilhamento cancelado ou indisponível:", error);
+        if (isShareAbort(error)) {
+          setStatus("Compartilhamento cancelado.");
+          return;
+        }
       }
     }
 
-    if (nav.share) {
-      try {
-        await nav.share({
-          title: "Alma Escrita",
-          text,
-        });
-        setStatus("Texto compartilhado. Este navegador não permite compartilhar a imagem diretamente.");
-        return;
-      } catch (error) {
-        console.warn("Compartilhamento de texto cancelado ou indisponível:", error);
-      }
-    }
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const opened = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
 
     try {
       await navigator.clipboard.writeText(text);
-      setStatus("Este navegador não permite compartilhar imagem. Copiei o texto para você enviar manualmente.");
+      setStatus(
+        opened
+          ? "Texto copiado e WhatsApp Web aberto. No computador, baixe a imagem e anexe manualmente se quiser enviar a arte."
+          : "Texto copiado. O navegador bloqueou o WhatsApp Web; abra o WhatsApp e cole a mensagem. Para enviar a arte, use Baixar e anexe manualmente.",
+      );
       return;
     } catch (error) {
       console.warn("Clipboard indisponível:", error);
     }
 
-    setStatus("Compartilhamento de imagem indisponível neste navegador. Use Abrir imagem ou Baixar.");
+    setStatus(
+      opened
+        ? "WhatsApp Web aberto. No computador, use Baixar para salvar a imagem e anexar manualmente."
+        : "Compartilhamento de imagem indisponível neste navegador. Use Abrir imagem ou Baixar.",
+    );
   };
 
   const handleOpenImage = async () => {
