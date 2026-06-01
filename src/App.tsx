@@ -11,13 +11,17 @@ import {
 } from "@/data/messages";
 import { AuthModal, type MockUser } from "@/components/AuthModal";
 import { ProfileModal } from "@/components/ProfileModal";
+import ImageCreator from "@/components/ImageCreator";
+import MessageSpeaker from "@/components/MessageSpeaker";
 import {
-  GEN_MOODS,
+  GEN_LENGTHS,
   GEN_RECIPIENTS,
-  generateMessage,
-  type GenMood,
+  GEN_TONES,
+  type GenLength,
   type GenRecipient,
+  type GenTone,
 } from "@/data/generator";
+import { generateBookBasedMessage } from "@/data/bookBasedGenerator";
 
 const ALMA_SONORA_URL =
   "https://alma-sonora.vercel.app/";
@@ -31,6 +35,7 @@ const RECENT_KEY = "alma-escrita:recent";
 const RECENT_LIMIT = 5;
 const DAILY_KEY = "alma-escrita:daily";
 const THEME_KEY = "alma-escrita:theme";
+const SHARE_SIGNATURE = SIGNATURE;
 
 type Theme = "light" | "dark";
 
@@ -42,16 +47,20 @@ type Filter =
 interface GeneratedMessage {
   id: string;
   name: string;
-  mood: GenMood;
+  intention: string;
   recipient: GenRecipient;
+  tone: GenTone;
+  length: GenLength;
   text: string;
   createdAt: number;
 }
 
 interface GenForm {
   name: string;
-  mood: GenMood;
+  intention: string;
   recipient: GenRecipient;
+  tone: GenTone;
+  length: GenLength;
 }
 
 type RecentItem =
@@ -169,8 +178,10 @@ function App() {
   );
   const [genForm, setGenForm] = useLocalStorageState<GenForm>(GEN_FORM_KEY, {
     name: "",
-    mood: "feliz",
+    intention: "",
     recipient: "amor",
+    tone: "emocionante",
+    length: "média",
   });
   const [lastGenerated, setLastGenerated] =
     useLocalStorageState<GeneratedMessage | null>(LAST_GENERATED_KEY, null);
@@ -193,12 +204,14 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [imageCreatorText, setImageCreatorText] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("home");
   const [viewerItem, setViewerItem] = useState<RecentItem | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [mockUser, setMockUser] = useState<MockUser | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [generatingCustom, setGeneratingCustom] = useState(false);
   const generatedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -271,6 +284,20 @@ function App() {
       window.removeEventListener("keydown", onKey);
     };
   }, [creatorOpen]);
+
+  useEffect(() => {
+    if (!imageCreatorText) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setImageCreatorText(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [imageCreatorText]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -394,6 +421,10 @@ function App() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  function openImageCreator(message: string) {
+    setImageCreatorText(`${message.trim()}\n\nAlma Escrita`);
+  }
+
   function toggleFavorite(id: string) {
     setFavorites((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -405,50 +436,79 @@ function App() {
     setShowFavorites(false);
   }
 
-  function handleGenerate(e: React.FormEvent) {
+  async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    const text = generateMessage(genForm.name, genForm.mood, genForm.recipient);
-    const generated: GeneratedMessage = {
-      id: `gen-${Date.now()}`,
-      name: genForm.name.trim(),
-      mood: genForm.mood,
-      recipient: genForm.recipient,
-      text,
-      createdAt: Date.now(),
+    const request = {
+      name: genForm.name,
+      intention: genForm.intention ?? "",
+      recipient: genForm.recipient ?? "amor",
+      tone: genForm.tone ?? "emocionante",
+      length: genForm.length ?? "média",
     };
-    setLastGenerated(generated);
-    setToast("Mensagem criada com carinho ✨");
-    pushRecent({
-      kind: "generated",
-      key: `g:${generated.id}`,
-      text,
-      label: `Personalizada · ${generated.mood}`,
-      addedAt: Date.now(),
-    });
-    requestAnimationFrame(() => {
-      generatedRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+
+    setGeneratingCustom(true);
+    try {
+      const text = await generateBookBasedMessage(request);
+      const generated: GeneratedMessage = {
+        id: `gen-${Date.now()}`,
+        name: request.name.trim(),
+        intention: request.intention.trim(),
+        recipient: request.recipient,
+        tone: request.tone,
+        length: request.length,
+        text,
+        createdAt: Date.now(),
+      };
+      setLastGenerated(generated);
+      setToast("Mensagem criada com carinho ✨");
+      pushRecent({
+        kind: "generated",
+        key: `g:${generated.id}`,
+        text,
+        label: `Personalizada · ${generated.tone}`,
+        addedAt: Date.now(),
       });
-    });
+      requestAnimationFrame(() => {
+        generatedRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+    } catch (error) {
+      console.error("Erro ao gerar mensagem personalizada:", error);
+      setToast("Não consegui gerar a mensagem agora. Tente novamente.");
+    } finally {
+      setGeneratingCustom(false);
+    }
   }
 
-  function regenerate() {
+  async function regenerate() {
     if (!lastGenerated) return;
-    const text = generateMessage(
-      lastGenerated.name,
-      lastGenerated.mood,
-      lastGenerated.recipient,
-    );
-    const updated = { ...lastGenerated, text, createdAt: Date.now() };
-    setLastGenerated(updated);
-    pushRecent({
-      kind: "generated",
-      key: `g:${updated.id}-${updated.createdAt}`,
-      text,
-      label: `Personalizada · ${updated.mood}`,
-      addedAt: Date.now(),
-    });
+    setGeneratingCustom(true);
+    try {
+      const request = {
+        name: lastGenerated.name,
+        intention: lastGenerated.intention ?? "",
+        recipient: lastGenerated.recipient,
+        tone: lastGenerated.tone ?? "emocionante",
+        length: lastGenerated.length ?? "média",
+      };
+      const text = await generateBookBasedMessage(request);
+      const updated = { ...lastGenerated, ...request, text, createdAt: Date.now() };
+      setLastGenerated(updated);
+      pushRecent({
+        kind: "generated",
+        key: `g:${updated.id}-${updated.createdAt}`,
+        text,
+        label: `Personalizada · ${updated.tone}`,
+        addedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error("Erro ao gerar outra mensagem personalizada:", error);
+      setToast("Não consegui gerar outra mensagem agora.");
+    } finally {
+      setGeneratingCustom(false);
+    }
   }
 
   const isCustomFavorited =
@@ -457,7 +517,7 @@ function App() {
       (g) =>
         g.text === lastGenerated.text &&
         g.name === lastGenerated.name &&
-        g.mood === lastGenerated.mood &&
+        g.tone === lastGenerated.tone &&
         g.recipient === lastGenerated.recipient,
     );
 
@@ -470,7 +530,7 @@ function App() {
             !(
               g.text === lastGenerated.text &&
               g.name === lastGenerated.name &&
-              g.mood === lastGenerated.mood &&
+              g.tone === lastGenerated.tone &&
               g.recipient === lastGenerated.recipient
             ),
         ),
@@ -873,6 +933,17 @@ function App() {
                 <span aria-hidden>↗</span>
                 Compartilhar
               </button>
+              <button
+                type="button"
+                onClick={() =>
+                  openImageCreator(applyGreeting(greeting, dailyMessage.text))
+                }
+                className="btn-soft inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full"
+              >
+                <span aria-hidden>▣</span>
+                Gerar imagem
+              </button>
+              <MessageSpeaker text={applyGreeting(greeting, dailyMessage.text)} />
             </div>
           </article>
         </section>
@@ -981,6 +1052,15 @@ function App() {
                       <span aria-hidden>↗</span>
                       Compartilhar
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => openImageCreator(q.text)}
+                      className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
+                    >
+                      <span aria-hidden>▣</span>
+                      Gerar imagem
+                    </button>
+                    <MessageSpeaker text={q.text} />
                   </div>
                 </article>
               );
@@ -1225,6 +1305,15 @@ function App() {
                         <span aria-hidden>↗</span>
                         Compartilhar
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => openImageCreator(m.text)}
+                        className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
+                      >
+                        <span aria-hidden>▣</span>
+                        Gerar imagem
+                      </button>
+                      <MessageSpeaker text={m.text} />
                     </div>
                   </article>
                 );
@@ -1239,6 +1328,42 @@ function App() {
           Feito com carinho · Jefferson Poeta Sonhador
         </p>
       </footer>
+
+      {/* Image Creator Modal */}
+      {imageCreatorText && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="image-creator-title"
+          className="fixed inset-0 z-[58] flex items-end sm:items-center justify-center fade-in"
+        >
+          <div
+            className="absolute inset-0 bg-[hsl(var(--foreground)/0.45)] backdrop-blur-sm"
+            onClick={() => setImageCreatorText(null)}
+          />
+          <div className="relative w-full sm:max-w-xl mx-auto sm:m-6 max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[hsl(var(--background))] shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 sm:px-7 py-4 bg-[hsl(var(--background))] border-b border-[hsl(var(--border))]">
+              <h2
+                id="image-creator-title"
+                className="font-serif text-xl sm:text-2xl text-[hsl(var(--primary))] truncate"
+              >
+                Gerar imagem
+              </h2>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => setImageCreatorText(null)}
+                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-5 sm:px-7 py-6">
+              <ImageCreator text={imageCreatorText} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Creator Modal */}
       {creatorOpen && (
@@ -1301,19 +1426,37 @@ function App() {
 
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Como você está se sentindo?
+                    O que você quer dizer?
                   </span>
-                  <select
-                    value={genForm.mood}
+                  <textarea
+                    rows={4}
+                    value={genForm.intention ?? ""}
                     onChange={(e) =>
                       setGenForm({
                         ...genForm,
-                        mood: e.target.value as GenMood,
+                        intention: e.target.value,
+                      })
+                    }
+                    placeholder="Ex.: Quero agradecer por tudo, pedir perdão, declarar meu amor..."
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Como você está se sentindo?
+                  </span>
+                  <select
+                    value={genForm.tone ?? "emocionante"}
+                    onChange={(e) =>
+                      setGenForm({
+                        ...genForm,
+                        tone: e.target.value as GenTone,
                       })
                     }
                     className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   >
-                    {GEN_MOODS.map((m) => (
+                    {GEN_TONES.map((m) => (
                       <option key={m} value={m}>
                         {m.charAt(0).toUpperCase() + m.slice(1)}
                       </option>
@@ -1392,6 +1535,15 @@ function App() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => openImageCreator(lastGenerated.text)}
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
+                    >
+                      <span aria-hidden>▣</span>
+                      Gerar imagem
+                    </button>
+                    <MessageSpeaker text={lastGenerated.text} />
+                    <button
+                      type="button"
                       onClick={toggleCustomFavorite}
                       className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition ${
                         isCustomFavorited
@@ -1458,6 +1610,14 @@ function App() {
                             >
                               Compartilhar
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => openImageCreator(g.text)}
+                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
+                            >
+                              Gerar imagem
+                            </button>
+                            <MessageSpeaker text={g.text} />
                             <button
                               type="button"
                               aria-label="Remover dos favoritos"
@@ -1550,6 +1710,15 @@ function App() {
                   <span aria-hidden>↗</span>
                   Compartilhar
                 </button>
+                <button
+                  type="button"
+                  onClick={() => openImageCreator(viewerItem.text)}
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
+                >
+                  <span aria-hidden>▣</span>
+                  Gerar imagem
+                </button>
+                <MessageSpeaker text={viewerItem.text} />
                 <button
                   type="button"
                   onClick={() => setViewerItem(null)}

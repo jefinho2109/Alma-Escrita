@@ -48,7 +48,7 @@ export const MOODS: Mood[] = [
   "Apaixonado",
 ];
 
-export const SIGNATURE = "— Jefferson Poeta Sonhador";
+export const SIGNATURE = "Alma Escrita";
 
 export const MESSAGES: Message[] = [
   {

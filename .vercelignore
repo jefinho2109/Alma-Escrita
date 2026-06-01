@@ -1,0 +1,17 @@
+node_modules
+.git
+.gradle
+.local
+.agents
+.replit-artifact
+app
+build
+gradle
+artifacts
+book-imports
+android.keystore
+service-account.json
+*.apk
+*.aab
+*.jks
+*.keystore
