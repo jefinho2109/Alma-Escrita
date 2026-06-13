@@ -13,5 +13,9 @@ export async function generateAIMsg(prompt: string): Promise<string> {
   }
 
   const data = await response.json();
+  if (data?.fallback) {
+    throw new Error("Gemini indisponível; usando fallback autoral local");
+  }
+
   return data?.text?.trim() || "Nao consegui gerar uma mensagem agora.";
 }
