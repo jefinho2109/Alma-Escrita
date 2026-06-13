@@ -1,10 +1,18 @@
 export async function generateAIMsg(prompt: string): Promise<string> {
   const response = await fetch("/api/gemini-message", {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      Pragma: "no-cache",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({
+      prompt,
+      requestNonce:
+        globalThis.crypto?.randomUUID?.() ||
+        `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    }),
   });
 
   if (!response.ok) {

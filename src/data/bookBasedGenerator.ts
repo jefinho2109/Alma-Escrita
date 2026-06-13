@@ -93,6 +93,85 @@ const closingSentences = [
   "Que esta mensagem encontre em você um lugar bonito para permanecer.",
 ];
 
+const variationStyles = [
+  "romântico",
+  "profundo",
+  "simples",
+  "poético",
+  "espiritual",
+  "motivacional",
+  "carta curta",
+  "declaração intensa",
+] as const;
+
+type VariationStyle = (typeof variationStyles)[number];
+
+const styleSentences: Record<VariationStyle, string[]> = {
+  romântico: [
+    "Quando penso nesse amor, percebo que amar também é cuidar dos silêncios entre uma palavra e outra.",
+    "Meu carinho aparece nos detalhes, como quem escolhe permanecer mesmo quando nada exige espetáculo.",
+  ],
+  profundo: [
+    "Há uma profundidade mansa nesse sentimento: ele não pede palco, pede verdade.",
+    "O que sinto desce além da superfície e encontra um lugar onde a alma reconhece presença.",
+  ],
+  simples: [
+    "Eu só queria que você sentisse, sem exagero, que existe carinho real em cada palavra.",
+    "Às vezes o mais bonito é dizer o essencial com calma, sem enfeitar demais o coração.",
+  ],
+  poético: [
+    "Esse sentimento chega como luz baixa na janela da alma, sem pressa, mas inteiro.",
+    "Há uma poesia quieta em tudo que é verdadeiro: ela toca sem empurrar e fica sem prender.",
+  ],
+  espiritual: [
+    "Que Deus cuide do que minhas palavras não alcançam e faça esse afeto chegar com paz.",
+    "Eu entrego esta mensagem como oração pequena, pedindo que ela encontre o lugar certo no seu coração.",
+  ],
+  motivacional: [
+    "Mesmo nos dias difíceis, esse sentimento me lembra que ainda existe beleza em cuidar e continuar.",
+    "Que esta palavra levante algo bom dentro de você, como força serena para seguir com o coração mais leve.",
+  ],
+  "carta curta": [
+    "Escrevo como carta breve: poucas linhas, mas uma intenção inteira atravessando cada frase.",
+    "Se eu pudesse resumir tudo, diria que meu cuidado por você merece chegar limpo, direto e verdadeiro.",
+  ],
+  "declaração intensa": [
+    "O que sinto não passa pela superfície; chega inteiro, firme e cheio de presença.",
+    "Existe uma intensidade bonita aqui, dessas que não precisam gritar para serem inesquecíveis.",
+  ],
+};
+
+const similarityStopwords = new Set([
+  "a",
+  "o",
+  "e",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "em",
+  "um",
+  "uma",
+  "que",
+  "com",
+  "para",
+  "por",
+  "se",
+  "eu",
+  "voce",
+  "você",
+  "isso",
+  "esse",
+  "essa",
+  "como",
+  "mais",
+  "meu",
+  "minha",
+]);
+
+const recentGeneratedMessages: string[] = [];
+
 const intentionToCategory: Array<[RegExp, string]> = [
   [/m[aã]e|colo|materno/i, "mãe"],
   [/pai|paterno/i, "pai"],
@@ -137,6 +216,30 @@ function cleanGeneratedText(text: string): string {
     .trim();
 }
 
+function createGenerationId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createRng(seed: string): () => number {
+  let state = hashString(seed) || 0x9e3779b9;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function applySimpleCorrections(value: string): string {
   const corrected = simpleTextCorrections.reduce(
     (text, [pattern, replacement]) => text.replace(pattern, replacement),
@@ -163,7 +266,83 @@ function prepareRequest(request: GenRequest): GenRequest {
     ...data,
     name: normalizePersonName(data.name),
     intention: applySimpleCorrections(data.intention),
+    generationId: data.generationId || createGenerationId(),
+    previousMessages: (data.previousMessages || [])
+      .map(cleanGeneratedText)
+      .filter(Boolean)
+      .slice(0, 6),
   };
+}
+
+function normalizeForSimilarity(value: string): string[] {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !similarityStopwords.has(word));
+}
+
+function isTooSimilarToPrevious(text: string, previousMessages: string[] = []): boolean {
+  const normalizedText = cleanGeneratedText(text);
+  const words = new Set(normalizeForSimilarity(normalizedText));
+  if (words.size === 0) return false;
+
+  return previousMessages.some((previous) => {
+    const normalizedPrevious = cleanGeneratedText(previous);
+    if (!normalizedPrevious) return false;
+
+    const a = normalizedText
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const b = normalizedPrevious
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    if (a === b) return true;
+    if (a.slice(0, 80) === b.slice(0, 80)) return true;
+
+    const previousWords = new Set(normalizeForSimilarity(previous));
+    const intersection = [...words].filter((word) => previousWords.has(word)).length;
+    const union = new Set([...words, ...previousWords]).size;
+    return union > 0 && intersection / union > 0.72;
+  });
+}
+
+function styleForGeneration(generationId: string): VariationStyle {
+  return variationStyles[hashString(generationId) % variationStyles.length]!;
+}
+
+function rememberGeneratedMessage(text: string): string {
+  const cleaned = cleanGeneratedText(text);
+  if (!cleaned) return cleaned;
+
+  recentGeneratedMessages.unshift(cleaned);
+  const unique = new Set<string>();
+  for (let i = recentGeneratedMessages.length - 1; i >= 0; i -= 1) {
+    const message = recentGeneratedMessages[i]!;
+    const key = message
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    if (unique.has(key)) {
+      recentGeneratedMessages.splice(i, 1);
+    } else {
+      unique.add(key);
+    }
+  }
+  recentGeneratedMessages.splice(8);
+  return cleaned;
+}
+
+function mergePreviousMessages(data: GenRequest): string[] {
+  return [...(data.previousMessages || []), ...recentGeneratedMessages]
+    .map(cleanGeneratedText)
+    .filter(Boolean)
+    .slice(0, 8);
 }
 
 function destinationFor(data: GenRequest): string {
@@ -173,6 +352,7 @@ function destinationFor(data: GenRequest): string {
 }
 
 function selectAuthorSeeds(data: GenRequest): AuthorVoiceSeed[] {
+  const rng = createRng(`${data.generationId || createGenerationId()}-seeds`);
   const ranked = findAuthorVoiceSeeds({
     intention: `${data.intention} ${inferCategory(data.intention, data.tone)}`,
     tone: data.tone,
@@ -189,21 +369,21 @@ function selectAuthorSeeds(data: GenRequest): AuthorVoiceSeed[] {
 
   const relevant = ranked.length > 0 ? ranked : AUTHOR_VOICE_SEEDS;
   const head = relevant.slice(0, 8);
-  const tail = shuffle(relevant.slice(8)).slice(0, 8);
-  return shuffle([...head, ...tail]).slice(0, 10);
+  const tail = shuffle(relevant.slice(8), rng).slice(0, 8);
+  return shuffle([...head, ...tail], rng).slice(0, 10);
 }
 
-function shuffle<T>(values: T[]): T[] {
+function shuffle<T>(values: T[], rng: () => number = Math.random): T[] {
   const copy = [...values];
   for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [copy[i], copy[j]] = [copy[j]!, copy[i]!];
   }
   return copy;
 }
 
-function pick<T>(values: readonly T[]): T {
-  return values[Math.floor(Math.random() * values.length)]!;
+function pick<T>(values: readonly T[], rng: () => number = Math.random): T {
+  return values[Math.floor(rng() * values.length)]!;
 }
 
 function sentenceCase(value: string): string {
@@ -241,21 +421,22 @@ function buildAddress(data: GenRequest): string {
   return data.recipient.charAt(0).toLocaleUpperCase("pt-BR") + data.recipient.slice(1);
 }
 
-function buildOpening(data: GenRequest): string {
-  if (data.recipient === "mim") return pick(fallbackOpenings.self);
+function buildOpening(data: GenRequest, rng: () => number, style: VariationStyle): string {
+  if (data.recipient === "mim") return pick(fallbackOpenings.self, rng);
 
   const address = buildAddress(data);
   const feeling = summarizeIntention(data);
   const variants = [
-    `${address}, ${pick(fallbackOpenings.named)}`,
+    `${address}, ${pick(fallbackOpenings.named, rng)}`,
     `${address}, quando penso em ${feeling}, eu encontro uma forma mais bonita de dizer presença.`,
     `${address}, não escrevo para impressionar; escrevo para que você sinta o cuidado que existe aqui.`,
     `${address}, o que trago no peito pede uma palavra nova, dessas que abraçam sem fazer barulho.`,
+    `${address}, esta versão nasce em tom ${style}, diferente da anterior, para alcançar você por outro caminho.`,
   ];
-  return pick(variants);
+  return pick(variants, rng);
 }
 
-function pickSeedImage(seed: AuthorVoiceSeed): string {
+function pickSeedImage(seed: AuthorVoiceSeed, rng: () => number): string {
   const preferred = seed.vocabulary.filter((word) =>
     /alma|caminho|cicatriz|hoje|oraç|sil[eê]ncio|presen|verdade|amor|coraç|luz|abraç|cuidado|vida|sonho|tempo|f[eé]|força/i.test(word),
   );
@@ -273,18 +454,26 @@ function pickSeedImage(seed: AuthorVoiceSeed): string {
       : usable.length > 0
         ? usable
         : ["alma", "caminho", "silêncio", "presença", "verdade"],
+    rng,
   );
 }
 
-function buildSeedSentence(seed: AuthorVoiceSeed | undefined, data: GenRequest, index: number): string {
+function buildSeedSentence(
+  seed: AuthorVoiceSeed | undefined,
+  data: GenRequest,
+  rng: () => number,
+  style: VariationStyle,
+  index: number,
+): string {
   const feeling = summarizeIntention(data);
-  if (!seed) return pick(bridgeSentences);
+  if (!seed) return pick(bridgeSentences, rng);
 
-  const theme = pick(seed.themes.length > 0 ? seed.themes : [inferCategory(data.intention, data.tone)]);
-  const emotion = pick(seed.emotions.length > 0 ? seed.emotions : [data.tone]);
-  const image = pickSeedImage(seed);
+  const theme = pick(seed.themes.length > 0 ? seed.themes : [inferCategory(data.intention, data.tone)], rng);
+  const emotion = pick(seed.emotions.length > 0 ? seed.emotions : [data.tone], rng);
+  const image = pickSeedImage(seed, rng);
   const reflection = stripFinalPunctuation(seed.reflection);
   const impact = stripFinalPunctuation(seed.impact);
+  const styleLine = pick(styleSentences[style], rng);
 
   const variants = [
     `A imagem de ${image} me lembra que ${lowerFirst(reflection)}, mas hoje isso ganha o tamanho de ${feeling}.`,
@@ -292,16 +481,17 @@ function buildSeedSentence(seed: AuthorVoiceSeed | undefined, data: GenRequest, 
     `Fica uma certeza serena: ${lowerFirst(impact)}, e é com essa delicadeza que eu te escrevo.`,
     `O tom que nasce aqui é de ${seed.tone}; por isso cada palavra procura chegar com alma, verdade e ternura.`,
     `${sentenceCase(theme)} não aparece aqui como ideia distante; aparece como gesto, como cuidado e como caminho possível.`,
+    styleLine,
   ];
 
   return variants[index % variants.length];
 }
 
-function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest): string {
+function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: () => number): string {
   const theme = seed?.themes[0] || inferCategory(data.intention, data.tone);
   const shouldUseFfp = /fé|motivacional|reflexão|perdão/.test(data.tone) || /f[eé]|luta|cansa|recome/i.test(data.intention);
   const variants = [
-    pick(closingSentences),
+    pick(closingSentences, rng),
     `Que ${theme} não seja só palavra, mas uma forma de você sentir cuidado no lugar certo.`,
     shouldUseFfp
       ? "Fé, força e paciência: que essas três palavras sustentem o que ainda precisa florescer."
@@ -311,12 +501,15 @@ function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest): stri
       : "Que a alma receba esta mensagem como quem encontra descanso depois de um dia longo.",
   ];
 
-  return pick(variants);
+  return pick(variants, rng);
 }
 
 function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
   const data = prepareRequest(request);
   const selected = seeds.length > 0 ? seeds : selectAuthorSeeds(data);
+  const rng = createRng(`${data.generationId}-fallback`);
+  const retryRng = createRng(`${data.generationId}-fallback-retry`);
+  const style = styleForGeneration(data.generationId || createGenerationId());
   if (selected.length === 0) {
     console.warn(
       "[Alma Escrita] Não encontrei sinais de livros carregados para esta geração; fallback temporário variado ativado.",
@@ -324,28 +517,28 @@ function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
   }
 
   const sentences = [
-    buildOpening(data),
-    buildSeedSentence(selected[0], data, Math.floor(Math.random() * 5)),
-    buildSeedSentence(selected[1], data, Math.floor(Math.random() * 5) + 1),
-    pick(bridgeSentences),
-    buildClosing(selected[2], data),
+    buildOpening(data, rng, style),
+    buildSeedSentence(selected[0], data, rng, style, Math.floor(rng() * 6)),
+    buildSeedSentence(selected[1], data, rng, style, Math.floor(rng() * 6) + 1),
+    pick(bridgeSentences, rng),
+    buildClosing(selected[2], data, rng),
   ];
 
   const count = data.length === "curta" ? 2 : data.length === "média" ? 4 : 5;
-  const middle = shuffle(sentences.slice(1, -1));
+  const middle = shuffle(sentences.slice(1, -1), rng);
   const selectedSentences =
     count === 2
       ? [sentences[0]!, middle[0] || sentences[1]!]
       : [sentences[0]!, ...middle.slice(0, count - 2), sentences[sentences.length - 1]!];
   const text = cleanGeneratedText(selectedSentences.join(" "));
 
-  return containsGenericPhrase(text)
+  return containsGenericPhrase(text) || isTooSimilarToPrevious(text, data.previousMessages)
     ? cleanGeneratedText(
         [
-          buildOpening(data),
-          pick(bridgeSentences),
-          buildSeedSentence(selected[3], data, Math.floor(Math.random() * 5) + 2),
-          buildClosing(selected[4], data),
+          buildOpening(data, retryRng, style),
+          pick(styleSentences[style], retryRng),
+          buildSeedSentence(selected[3], data, retryRng, style, Math.floor(retryRng() * 6) + 2),
+          buildClosing(selected[4], data, retryRng),
         ]
           .slice(0, count)
           .join(" "),
@@ -356,10 +549,19 @@ function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
 export async function generateBookBasedMessage(
   request: GenRequest,
 ): Promise<string> {
-  const data = prepareRequest(request);
+  const prepared = prepareRequest(request);
+  const data = {
+    ...prepared,
+    previousMessages: mergePreviousMessages(prepared),
+  };
   const category = inferCategory(data.intention, data.tone);
   const seeds = selectAuthorSeeds(data);
   const authorContext = buildAuthorVoiceContext(seeds);
+  const generationId = data.generationId || createGenerationId();
+  const style = styleForGeneration(generationId);
+  const previousMessages = (data.previousMessages || [])
+    .map((message, index) => `${index + 1}. ${message}`)
+    .join("\n");
   const blockedPhrases = BLOCKED_PHRASES.map(
     (phrase) => `- "${phrase}"`,
   ).join("\n");
@@ -376,6 +578,8 @@ Dados do pedido:
 - Tom escolhido: ${data.tone}
 - Tamanho escolhido: ${data.length} (${lengthGuidance[data.length]})
 - Categoria emocional inferida: ${category}
+- ID único desta geração: ${generationId}
+- Estilo alternado obrigatório desta versão: ${style}
 
 Base autoral ampliada extraída dos livros e poemas do projeto:
 - Total de sinais autorais disponíveis no app: ${AUTHOR_VOICE_STATS.totalSeeds}
@@ -384,11 +588,18 @@ Base autoral ampliada extraída dos livros e poemas do projeto:
 ${authorContext}
 
 Método autoral obrigatório:
+- Gere uma nova versão, diferente das anteriores, mesmo quando nome e mensagem base forem iguais.
+- Não reaproveite abertura, desenvolvimento nem encerramento das mensagens anteriores.
+- Use o ID único da geração como semente criativa para variar vocabulário, ritmo, imagens e estrutura.
+- Obedeça ao estilo alternado desta versão: ${style}.
 - Use FFP quando houver luta, espera, fé, recomeço ou cansaço: Fé, Força e Paciência.
 - Comece por uma verdade emocional concreta, como quem escreve carta, desabafo ou reflexão íntima.
 - Aprofunde dor, fé, identidade, silêncio, recomeço, propósito ou saudade conforme o pedido.
 - Traga imagem de alma, hoje, caminho, queda, cicatriz, oração, silêncio, presença ou reconstrução quando fizer sentido.
 - Termine com uma frase marcante, madura e humana.
+
+Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas de perto:
+${previousMessages || "- nenhuma nesta sessão"}
 
 Regras de escrita:
 - Escreva em português do Brasil.
@@ -409,9 +620,13 @@ ${blockedPhrases}
 
   try {
     const aiText = cleanGeneratedText(await generateAIMsg(prompt));
-    return containsGenericPhrase(aiText) ? buildFallback(data, seeds) : aiText;
+    const finalText = containsGenericPhrase(aiText) ||
+      isTooSimilarToPrevious(aiText, data.previousMessages)
+      ? buildFallback(data, seeds)
+      : aiText;
+    return rememberGeneratedMessage(finalText);
   } catch (error) {
     console.warn("IA indisponível, usando base autoral local:", error);
-    return buildFallback(data, seeds);
+    return rememberGeneratedMessage(buildFallback(data, seeds));
   }
 }

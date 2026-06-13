@@ -35,6 +35,8 @@ export interface GenRequest {
   intention: string;
   tone: GenTone;
   length: GenLength;
+  generationId?: string;
+  previousMessages?: string[];
 }
 
 export const GEN_RECIPIENTS: GenRecipient[] = [
@@ -128,6 +130,11 @@ export function normalizeGenRequest(request: GenRequest): GenRequest {
     intention: request.intention.trim(),
     tone: GEN_TONES.includes(request.tone) ? request.tone : "emocionante",
     length: GEN_LENGTHS.includes(request.length) ? request.length : "média",
+    generationId: request.generationId?.trim() || undefined,
+    previousMessages: (request.previousMessages || [])
+      .map((message) => message.trim())
+      .filter(Boolean)
+      .slice(0, 6),
   };
 }
 
