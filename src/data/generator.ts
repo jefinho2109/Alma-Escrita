@@ -29,9 +29,38 @@ export type GenTone =
 
 export type GenLength = "curta" | "média" | "longa";
 
+export type GenRelationship =
+  | "Esposa"
+  | "Marido"
+  | "Namorada"
+  | "Namorado"
+  | "Mãe"
+  | "Pai"
+  | "Filho"
+  | "Filha"
+  | "Amigo"
+  | "Amiga"
+  | "Irmão"
+  | "Irmã"
+  | "Outro";
+
+export type GenOccasion =
+  | "Declaração de amor"
+  | "Agradecimento"
+  | "Homenagem"
+  | "Saudade"
+  | "Pedido de desculpas"
+  | "Motivação"
+  | "Aniversário"
+  | "Fé e superação";
+
 export interface GenRequest {
   recipient: GenRecipient;
   name: string;
+  senderName?: string;
+  relationship?: GenRelationship;
+  occasion?: GenOccasion;
+  sharedMemory?: string;
   intention: string;
   tone: GenTone;
   length: GenLength;
@@ -71,6 +100,33 @@ export const GEN_TONES: GenTone[] = [
 ];
 
 export const GEN_LENGTHS: GenLength[] = ["curta", "média", "longa"];
+
+export const GEN_RELATIONSHIPS: GenRelationship[] = [
+  "Esposa",
+  "Marido",
+  "Namorada",
+  "Namorado",
+  "Mãe",
+  "Pai",
+  "Filho",
+  "Filha",
+  "Amigo",
+  "Amiga",
+  "Irmão",
+  "Irmã",
+  "Outro",
+];
+
+export const GEN_OCCASIONS: GenOccasion[] = [
+  "Declaração de amor",
+  "Agradecimento",
+  "Homenagem",
+  "Saudade",
+  "Pedido de desculpas",
+  "Motivação",
+  "Aniversário",
+  "Fé e superação",
+];
 
 const TONE_OPENINGS: Record<GenTone, string[]> = {
   romântica: [

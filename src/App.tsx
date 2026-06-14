@@ -16,10 +16,14 @@ import ImageCreator from "@/components/ImageCreator";
 import MessageSpeaker from "@/components/MessageSpeaker";
 import {
   GEN_LENGTHS,
+  GEN_OCCASIONS,
+  GEN_RELATIONSHIPS,
   GEN_RECIPIENTS,
   GEN_TONES,
   type GenLength,
+  type GenOccasion,
   type GenRecipient,
+  type GenRelationship,
   type GenTone,
 } from "@/data/generator";
 import { generateBookBasedMessage } from "@/data/bookBasedGenerator";
@@ -58,6 +62,10 @@ interface GeneratedMessage {
 
 interface GenForm {
   name: string;
+  senderName: string;
+  relationship: string;
+  occasion: string;
+  sharedMemory: string;
   intention: string;
   recipient: GenRecipient;
   tone: GenTone;
@@ -143,11 +151,11 @@ function applyGreeting(greeting: string, text: string): string {
   const cleaned = stripLeadingGreeting(text);
   return `${greeting}, ${cleaned.charAt(0).toLowerCase()}${cleaned.slice(1)}`;
 }
+
 function pickDaily(dateKey: string): Message {
   const idx = hashString(dateKey) % MESSAGES.length;
   return MESSAGES[idx];
-}
-function categoryEmoji(c: Category): string {
+}function categoryEmoji(c: Category): string {
   switch (c) {
     case "Amor": return "❤";
     case "Motivação": return "✦";
@@ -177,6 +185,10 @@ function App() {
   );
   const [genForm, setGenForm] = useLocalStorageState<GenForm>(GEN_FORM_KEY, {
     name: "",
+    senderName: "",
+    relationship: "",
+    occasion: "",
+    sharedMemory: "",
     intention: "",
     recipient: "amor",
     tone: "emocionante",
@@ -439,6 +451,10 @@ function App() {
     e.preventDefault();
     const request = {
       name: genForm.name,
+      senderName: genForm.senderName || undefined,
+      relationship: (genForm.relationship as any) || undefined,
+      occasion: (genForm.occasion as any) || undefined,
+      sharedMemory: genForm.sharedMemory || undefined,
       intention: genForm.intention ?? "",
       recipient: genForm.recipient ?? "amor",
       tone: genForm.tone ?? "emocionante",
@@ -1422,6 +1438,85 @@ function App() {
                     className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   />
                 </label>
+
+                <div className="mt-2 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-4">
+                  <h3 className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                    <span aria-hidden>✨</span>
+                    Detalhes para Personalização (Opcional)
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                        Seu nome
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Ex.: Jefferson"
+                        value={genForm.senderName}
+                        onChange={(e) =>
+                          setGenForm({ ...genForm, senderName: e.target.value })
+                        }
+                        className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm"
+                      />
+                    </label>
+
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                        Sua relação com a pessoa
+                      </span>
+                      <select
+                        value={genForm.relationship}
+                        onChange={(e) =>
+                          setGenForm({ ...genForm, relationship: e.target.value })
+                        }
+                        className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm"
+                      >
+                        <option value="">Selecione...</option>
+                        {GEN_RELATIONSHIPS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                      Motivo da mensagem
+                    </span>
+                    <select
+                      value={genForm.occasion}
+                      onChange={(e) =>
+                        setGenForm({ ...genForm, occasion: e.target.value })
+                      }
+                      className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm"
+                    >
+                      <option value="">Selecione...</option>
+                      {GEN_OCCASIONS.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                      Memória ou detalhe especial
+                    </span>
+                    <textarea
+                      rows={3}
+                      placeholder="Ex.: Sempre esteve ao meu lado nos momentos mais difíceis da minha vida."
+                      value={genForm.sharedMemory}
+                      onChange={(e) =>
+                        setGenForm({ ...genForm, sharedMemory: e.target.value })
+                      }
+                      className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm resize-none"
+                    />
+                  </label>
+                </div>
 
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
