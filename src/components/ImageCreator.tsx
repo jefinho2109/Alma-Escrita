@@ -1,29 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
+import { Download, Share2, Image as ImageIcon, Instagram } from "lucide-react";
 
 interface ImageCreatorProps {
   text: string;
 }
 
-interface NativeImageBridge {
-  isAvailable?: () => boolean;
-  savePng?: (dataUrl: string, fileName: string) => boolean;
-  sharePng?: (dataUrl: string, fileName: string) => boolean;
-  openPng?: (dataUrl: string, fileName: string) => boolean;
-}
-
-declare global {
-  interface Window {
-    AlmaImage?: NativeImageBridge;
-  }
-}
-
-const IMAGE_FILE_NAME = "mensagem-alma-escrita.png";
-
-type TemplateKind = "short" | "medium" | "long" | "extended";
+type ImageTheme = "claro" | "escuro" | "papel" | "romantico" | "fe" | "minimalista";
+type ImageFormat = "stories" | "feed";
 
 interface ImageTemplate {
-  kind: TemplateKind;
+  kind: "short" | "medium" | "long" | "extended";
   minHeight: number;
   fontSize: number;
   minFontSize: number;
@@ -40,12 +27,28 @@ interface ImageLayout extends ImageTemplate {
   footerGap: number;
 }
 
+const THEMES: Record<ImageTheme, { bg: string; text: string; font: string; shadow: string; label: string }> = {
+  claro: { bg: "bg-stone-50", text: "text-stone-800", font: "font-sans", shadow: "shadow-none", label: "Claro Elegante" },
+  escuro: { bg: "bg-stone-900", text: "text-stone-100", font: "font-sans", shadow: "shadow-none", label: "Escuro Elegante" },
+  papel: { bg: "bg-[#F9F7F2]", text: "text-stone-800", font: "font-serif", shadow: "shadow-sm", label: "Papel / Poesia" },
+  romantico: { bg: "bg-gradient-to-br from-rose-50 to-orange-50", text: "text-rose-900", font: "font-serif", shadow: "shadow-sm", label: "Romântico" },
+  fe: { bg: "bg-gradient-to-br from-slate-800 to-slate-900", text: "text-amber-50", font: "font-serif", shadow: "shadow-lg", label: "Fé / Superação" },
+  minimalista: { bg: "bg-white", text: "text-black", font: "font-sans", shadow: "shadow-none", label: "Minimalista" },
+};
+
+const FORMATS: Record<ImageFormat, { label: string; isStories: boolean }> = {
+  stories: { label: "Status / Stories (9:16)", isStories: true },
+  feed: { label: "Quadrado / Feed (1:1)", isStories: false },
+};
+
+const IMAGE_FILE_NAME = "mensagem-alma-escrita.png";
+
 function splitMessage(rawText: string): { message: string; signature: string } {
   const cleaned = rawText.trim();
   const signatureMatch = cleaned.match(/\n+\s*(?:[—-]\s*)?(Alma Escrita)\s*$/i);
 
   if (!signatureMatch) {
-    return { message: cleaned, signature: "" };
+    return { message: cleaned, signature: "Alma Escrita" };
   }
 
   return {
@@ -54,68 +57,74 @@ function splitMessage(rawText: string): { message: string; signature: string } {
   };
 }
 
-function getTemplate(message: string): ImageTemplate {
+function getTemplate(message: string, format: ImageFormat): ImageTemplate {
   const length = message.replace(/\s+/g, " ").trim().length;
   const lines = Math.max(1, message.split(/\n+/).length);
   const weight = length + lines * 24;
+  const isStories = format === "stories";
+
+  const baseMinHeight = isStories ? 720 : 600;
+  const maxWidth = isStories ? 340 : 420;
+  const baseFontSize = isStories ? 28 : 24;
+  const baseMinFontSize = isStories ? 18 : 16;
 
   if (weight <= 150) {
     return {
       kind: "short",
-      minHeight: 640,
-      fontSize: 30,
-      minFontSize: 20,
-      lineHeight: 1.18,
-      padding: 34,
-      maxTextWidth: 292,
-      signatureSize: 20,
-      signatureAreaHeight: 76,
+      minHeight: baseMinHeight,
+      fontSize: baseFontSize + 4,
+      minFontSize: baseMinFontSize + 4,
+      lineHeight: 1.2,
+      padding: 36,
+      maxTextWidth: maxWidth,
+      signatureSize: 18,
+      signatureAreaHeight: 70,
     };
   }
 
   if (weight <= 300) {
     return {
       kind: "medium",
-      minHeight: 720,
-      fontSize: 25,
-      minFontSize: 17,
-      lineHeight: 1.22,
-      padding: 32,
-      maxTextWidth: 300,
-      signatureSize: 18,
-      signatureAreaHeight: 72,
+      minHeight: baseMinHeight + 40,
+      fontSize: baseFontSize,
+      minFontSize: baseMinFontSize,
+      lineHeight: 1.25,
+      padding: 34,
+      maxTextWidth: maxWidth,
+      signatureSize: 17,
+      signatureAreaHeight: 68,
     };
   }
 
   if (weight <= 520) {
     return {
       kind: "long",
-      minHeight: 860,
-      fontSize: 20,
-      minFontSize: 14,
-      lineHeight: 1.27,
-      padding: 30,
-      maxTextWidth: 304,
-      signatureSize: 17,
-      signatureAreaHeight: 68,
+      minHeight: baseMinHeight + 120,
+      fontSize: baseFontSize - 4,
+      minFontSize: baseMinFontSize - 2,
+      lineHeight: 1.3,
+      padding: 32,
+      maxTextWidth: maxWidth,
+      signatureSize: 16,
+      signatureAreaHeight: 64,
     };
   }
 
   return {
     kind: "extended",
-    minHeight: Math.min(1320, 920 + Math.ceil((weight - 520) / 3)),
-    fontSize: weight > 820 ? 15 : 17,
+    minHeight: Math.min(isStories ? 1200 : 900, baseMinHeight + 200 + Math.ceil((weight - 520) / 3)),
+    fontSize: weight > 820 ? baseMinFontSize - 4 : baseFontSize - 6,
     minFontSize: 12,
-    lineHeight: 1.32,
-    padding: 28,
-    maxTextWidth: 304,
-    signatureSize: 16,
-    signatureAreaHeight: 66,
+    lineHeight: 1.35,
+    padding: 30,
+    maxTextWidth: maxWidth,
+    signatureSize: 15,
+    signatureAreaHeight: 60,
   };
 }
 
-function getLayout(message: string, hasSignature: boolean): ImageLayout {
-  const template = getTemplate(message);
+function getLayout(message: string, hasSignature: boolean, format: ImageFormat): ImageLayout {
+  const template = getTemplate(message, format);
   const contentHeight = template.minHeight - template.padding * 2;
   const signatureAreaHeight = hasSignature ? template.signatureAreaHeight : 0;
   const footerGap = hasSignature ? (template.kind === "short" ? 24 : 20) : 0;
@@ -128,19 +137,6 @@ function getLayout(message: string, hasSignature: boolean): ImageLayout {
     textAreaHeight,
     footerGap,
   };
-}
-
-function getNativeImageBridge(): NativeImageBridge | null {
-  const bridge = window.AlmaImage;
-  if (!bridge) return null;
-
-  try {
-    if (bridge.isAvailable?.() === false) return null;
-  } catch {
-    return null;
-  }
-
-  return bridge;
 }
 
 function waitForNextPaint(): Promise<void> {
@@ -160,34 +156,24 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textFrameRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLParagraphElement | null>(null);
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  
   const [imgBlob, setImgBlob] = useState<Blob | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(24);
   const [textClamped, setTextClamped] = useState(false);
-
-  const getBackgroundStyle = () => {
-    const lower = text.toLowerCase();
-    if (lower.includes("bom dia")) return "linear-gradient(180deg, #FFD57E, #FFB347)";
-    if (lower.includes("boa tarde")) return "linear-gradient(180deg, #FFA17F, #00223E)";
-    if (lower.includes("boa noite")) return "linear-gradient(180deg, #2C3E50, #4CA1AF)";
-    if (lower.includes("amor")) return "linear-gradient(180deg, #FF6B6B, #FFD6D6)";
-    if (lower.includes("fé") || lower.includes("deus") || lower.includes("oração")) {
-      return "linear-gradient(180deg, #6A11CB, #2575FC)";
-    }
-    if (lower.includes("motivação") || lower.includes("força") || lower.includes("vencer")) {
-      return "linear-gradient(180deg, #F7971E, #FFD200)";
-    }
-    return "linear-gradient(180deg, #E0EAFC, #CFDEF3)";
-  };
+  
+  const [format, setFormat] = useState<ImageFormat>("stories");
+  const [theme, setTheme] = useState<ImageTheme>("papel");
 
   const { message, signature } = splitMessage(text);
   const template = useMemo(
-    () => getLayout(message, Boolean(signature)),
-    [message, signature],
+    () => getLayout(message, Boolean(signature), format),
+    [message, signature, format],
   );
+  
+  const themeStyles = THEMES[theme];
   const maxVisibleLines = Math.max(
     1,
     Math.floor(template.textAreaHeight / (fontSize * template.lineHeight)),
@@ -256,7 +242,6 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
   }, [objectUrl]);
 
   useEffect(() => {
-    setImgUrl(null);
     setImgBlob(null);
     setObjectUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -269,40 +254,48 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
     }, 250);
 
     return () => window.clearTimeout(timer);
-    // text changes only when the modal is opened with a new message.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text]);
+  }, [text, format, theme]);
 
   const generateImage = async (
     successMessage?: string,
-  ): Promise<{ dataUrl: string; blob: Blob; url: string } | null> => {
+  ): Promise<{ blob: Blob; url: string } | null> => {
     if (!containerRef.current) return null;
 
     setLoading(true);
     try {
       await waitForNextPaint();
+      
+      // Force high resolution for the target format
+      const targetWidth = format === "stories" ? 1080 : 1080;
+      const targetHeight = format === "stories" ? 1920 : 1080;
+      
       const dataUrl = await htmlToImage.toPng(containerRef.current, {
         cacheBust: true,
-        skipFonts: true,
-        pixelRatio: 3,
-        backgroundColor: "#0F172A",
-        width: containerRef.current.scrollWidth,
-        height: containerRef.current.scrollHeight,
+        skipFonts: false, // Allow fonts to render correctly
+        pixelRatio: 1, // We set explicit width/height, so pixelRatio 1 is fine for exact dimensions
+        backgroundColor: theme === "escuro" || theme === "fe" ? "#1c1917" : "#ffffff",
+        width: targetWidth,
+        height: targetHeight,
         style: {
           transform: "none",
+          width: `${targetWidth}px`,
+          height: `${targetHeight}px`,
         },
       });
+      
       const response = await fetch(dataUrl);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      setImgUrl(dataUrl);
+      
       setImgBlob(blob);
       setObjectUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return url;
       });
+      
       if (successMessage) setStatus(successMessage);
-      return { dataUrl, blob, url };
+      return { blob, url };
     } catch (err) {
       console.error("Erro ao gerar imagem:", err);
       setStatus("Não consegui gerar a imagem agora. Tente novamente.");
@@ -312,63 +305,8 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
     }
   };
 
-  const handleGenerate = async () => {
-    await generateImage("Imagem gerada com sucesso.");
-  };
-
-  const downloadImage = async (image: { dataUrl: string; blob: Blob }) => {
-    const nativeImage = getNativeImageBridge();
-    if (nativeImage?.savePng) {
-      try {
-        if (nativeImage.savePng(image.dataUrl, IMAGE_FILE_NAME)) {
-          return true;
-        }
-      } catch (error) {
-        console.warn("Salvar imagem via Android falhou, usando fallback web:", error);
-      }
-    }
-
-    const picker = window as Window & {
-      showSaveFilePicker?: (options: {
-        suggestedName: string;
-        types: Array<{
-          description: string;
-          accept: Record<string, string[]>;
-        }>;
-      }) => Promise<{
-        createWritable: () => Promise<{
-          write: (data: Blob) => Promise<void>;
-          close: () => Promise<void>;
-        }>;
-      }>;
-    };
-
-    if (picker.showSaveFilePicker) {
-      try {
-        const handle = await picker.showSaveFilePicker({
-          suggestedName: IMAGE_FILE_NAME,
-          types: [
-            {
-              description: "Imagem PNG",
-              accept: { "image/png": [".png"] },
-            },
-          ],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(image.blob);
-        await writable.close();
-        return true;
-      } catch (error) {
-        const name = error instanceof DOMException ? error.name : "";
-        if (name === "AbortError" || name === "NotAllowedError") {
-          console.info("Salvar arquivo cancelado pelo usuário.");
-          return false;
-        }
-        console.warn("Salvar arquivo via diálogo falhou, usando fallback por link:", error);
-      }
-    }
-
-    const url = URL.createObjectURL(image.blob);
+  const downloadImage = async (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = IMAGE_FILE_NAME;
@@ -380,41 +318,29 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
   };
 
   const handleDownload = async () => {
-    const generated = imgBlob && imgUrl
-      ? { blob: imgBlob, dataUrl: imgUrl }
+    const generated = imgBlob && objectUrl
+      ? { blob: imgBlob, url: objectUrl }
       : await generateImage("Imagem pronta.");
-    if (!generated?.blob || !generated.dataUrl) return;
+      
+    if (!generated?.blob) return;
 
-    const saved = await downloadImage(generated);
-    if (saved) setStatus("Imagem baixada.");
+    await downloadImage(generated.blob);
+    setStatus("Imagem baixada com sucesso.");
   };
 
   const handleShare = async () => {
-    const generated = imgBlob
-      ? { blob: imgBlob, dataUrl: imgUrl, url: objectUrl }
+    const generated = imgBlob && objectUrl
+      ? { blob: imgBlob, url: objectUrl }
       : await generateImage("Imagem pronta.");
+      
     if (!generated?.blob) return;
 
-    const nativeImage = getNativeImageBridge();
-    if (generated.dataUrl && nativeImage?.sharePng) {
-      try {
-        if (nativeImage.sharePng(generated.dataUrl, IMAGE_FILE_NAME)) {
-          setStatus("Imagem compartilhada.");
-          return;
-        }
-      } catch (error) {
-        console.warn("Compartilhamento via Android falhou, usando fallback web:", error);
-      }
-    }
-
-    const file = new File([generated.blob], "mensagem-alma-escrita.png", {
-      type: "image/png",
-    });
+    const file = new File([generated.blob], IMAGE_FILE_NAME, { type: "image/png" });
     const nav = navigator as Navigator & {
       canShare?: (data: ShareData) => boolean;
     };
-    const canShareFile =
-      Boolean(nav.share) && (!nav.canShare || nav.canShare({ files: [file] }));
+    
+    const canShareFile = Boolean(nav.share) && (!nav.canShare || nav.canShare({ files: [file] }));
 
     if (canShareFile) {
       try {
@@ -426,205 +352,202 @@ export default function ImageCreator({ text }: ImageCreatorProps) {
         setStatus("Imagem compartilhada.");
         return;
       } catch (error) {
-        console.warn("Compartilhamento cancelado ou indisponível:", error);
         if (isShareAbort(error)) {
           setStatus("Compartilhamento cancelado.");
           return;
         }
+        console.warn("Compartilhamento falhou, usando fallback de download:", error);
       }
     }
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    const opened = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus(
-        opened
-          ? "Texto copiado e WhatsApp Web aberto. No computador, baixe a imagem e anexe manualmente se quiser enviar a arte."
-          : "Texto copiado. O navegador bloqueou o WhatsApp Web; abra o WhatsApp e cole a mensagem. Para enviar a arte, use Baixar e anexe manualmente.",
-      );
-      return;
-    } catch (error) {
-      console.warn("Clipboard indisponível:", error);
-    }
-
-    setStatus(
-      opened
-        ? "WhatsApp Web aberto. No computador, use Baixar para salvar a imagem e anexar manualmente."
-        : "Compartilhamento de imagem indisponível neste navegador. Use Abrir imagem ou Baixar.",
-    );
-  };
-
-  const handleOpenImage = async () => {
-    const generated = objectUrl && imgUrl
-      ? { url: objectUrl, dataUrl: imgUrl }
-      : await generateImage("Imagem pronta.");
-    if (!generated?.url) return;
-
-    const nativeImage = getNativeImageBridge();
-    if (generated.dataUrl && nativeImage?.openPng) {
-      try {
-        if (nativeImage.openPng(generated.dataUrl, IMAGE_FILE_NAME)) {
-          setStatus("Imagem aberta.");
-          return;
-        }
-      } catch (error) {
-        console.warn("Abrir imagem via Android falhou, usando fallback web:", error);
-      }
-    }
-
-    const opened = window.open(generated.url, "_blank", "noopener,noreferrer");
-    if (!opened) {
-      setStatus("O navegador bloqueou a nova aba. Use Baixar para salvar a imagem.");
-    }
+    // Fallback: if share fails or is not supported, download automatically
+    await downloadImage(generated.blob);
+    setStatus("Compartilhamento não suportado. Imagem baixada para você postar manualmente.");
   };
 
   return (
-    <div className="w-full flex flex-col items-center gap-4">
-      <div
-        ref={containerRef}
-        className="w-full max-w-[360px] flex items-center justify-center rounded-2xl shadow-feature"
-        style={{
-          background: getBackgroundStyle(),
-          color: "#fff",
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          textAlign: "center",
-          height: `${template.minHeight}px`,
-          padding: `${template.padding}px`,
-          boxSizing: "border-box",
-        }}
-      >
-        <div
-          className="w-full"
-          style={{
-            height: `${template.contentHeight}px`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <div
-            ref={textFrameRef}
-            style={{
-              width: "100%",
-              height: `${template.textAreaHeight}px`,
-              flex: `0 0 ${template.textAreaHeight}px`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-          >
-            <p
-              ref={textRef}
-              className="font-semibold"
-              style={{
-                width: "100%",
-                maxWidth: `${template.maxTextWidth}px`,
-                margin: 0,
-                whiteSpace: "pre-wrap",
-                overflowWrap: "anywhere",
-                wordBreak: "normal",
-                hyphens: "auto",
-                fontSize: `${fontSize}px`,
-                lineHeight: template.lineHeight,
-                maxHeight: `${template.textAreaHeight}px`,
-                overflow: "hidden",
-                display: textClamped ? "-webkit-box" : "block",
-                WebkitBoxOrient: textClamped ? "vertical" : undefined,
-                WebkitLineClamp: textClamped ? maxVisibleLines : undefined,
-                textShadow: "0 2px 18px rgba(0,0,0,0.22)",
-              }}
-            >
-              {message}
-            </p>
-          </div>
-
-          {signature && (
-            <div
-              className="flex flex-col items-center"
-              style={{
-                gap: "10px",
-                opacity: 0.92,
-                height: `${template.signatureAreaHeight}px`,
-                marginTop: `${template.footerGap}px`,
-                justifyContent: "center",
-                flex: "0 0 auto",
-              }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  width: template.kind === "short" ? "92px" : "72px",
-                  height: "1px",
-                  background: "rgba(255,255,255,0.55)",
-                }}
-              />
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: `${template.signatureSize}px`,
-                  lineHeight: 1.1,
-                  fontStyle: "italic",
-                  letterSpacing: "0",
-                  textShadow: "0 2px 12px rgba(0,0,0,0.2)",
-                }}
+    <div className="w-full flex flex-col items-center gap-6">
+      {/* Controls */}
+      <div className="w-full max-w-md space-y-4 p-4 bg-stone-50 rounded-xl border border-stone-200">
+        <div>
+          <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2 block">
+            Formato
+          </label>
+          <div className="flex gap-2">
+            {(Object.keys(FORMATS) as ImageFormat[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFormat(f)}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  format === f
+                    ? "bg-stone-800 text-white"
+                    : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-100"
+                }`}
               >
-                {signature}
-              </p>
-            </div>
-          )}
+                {FORMATS[f].label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2 block">
+            Estilo Visual
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.keys(THEMES) as ImageTheme[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTheme(t)}
+                className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  theme === t
+                    ? "ring-2 ring-stone-800 bg-stone-200 text-stone-900"
+                    : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
+                }`}
+              >
+                {THEMES[t].label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-3 mt-1 flex-wrap justify-center">
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={loading}
-          className="btn-grad px-5 py-2.5 rounded-full font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+      {/* Preview Container */}
+      <div className="relative w-full max-w-sm mx-auto">
+        <div
+          ref={containerRef}
+          className={`w-full flex items-center justify-center rounded-2xl ${themeStyles.bg} ${themeStyles.text} ${themeStyles.font} ${themeStyles.shadow}`}
+          style={{
+            textAlign: "center",
+            height: `${template.minHeight}px`,
+            padding: `${template.padding}px`,
+            boxSizing: "border-box",
+            aspectRatio: format === "stories" ? "9/16" : "1/1",
+          }}
         >
-          {loading ? "Gerando..." : "Gerar imagem"}
-        </button>
+          <div
+            className="w-full flex flex-col items-center"
+            style={{
+              height: `${template.contentHeight}px`,
+            }}
+          >
+            <div
+              ref={textFrameRef}
+              className="w-full flex items-center justify-center overflow-hidden"
+              style={{
+                height: `${template.textAreaHeight}px`,
+                flex: `0 0 ${template.textAreaHeight}px`,
+              }}
+            >
+              <p
+                ref={textRef}
+                className="font-semibold"
+                style={{
+                  width: "100%",
+                  maxWidth: `${template.maxTextWidth}px`,
+                  margin: 0,
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
+                  wordBreak: "normal",
+                  hyphens: "auto",
+                  fontSize: `${fontSize}px`,
+                  lineHeight: template.lineHeight,
+                  maxHeight: `${template.textAreaHeight}px`,
+                  overflow: "hidden",
+                  display: textClamped ? "-webkit-box" : "block",
+                  WebkitBoxOrient: textClamped ? "vertical" : undefined,
+                  WebkitLineClamp: textClamped ? maxVisibleLines : undefined,
+                }}
+              >
+                {message}
+              </p>
+            </div>
+
+            {signature && (
+              <div
+                className="flex flex-col items-center justify-center"
+                style={{
+                  gap: "10px",
+                  opacity: 0.8,
+                  height: `${template.signatureAreaHeight}px`,
+                  marginTop: `${template.footerGap}px`,
+                  flex: "0 0 auto",
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="bg-current"
+                  style={{
+                    width: template.kind === "short" ? "80px" : "60px",
+                    height: "1px",
+                    opacity: 0.4,
+                  }}
+                />
+                <p
+                  className="italic tracking-wide"
+                  style={{
+                    margin: 0,
+                    fontSize: `${template.signatureSize}px`,
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {signature}
+                  {/* Espaço reservado para assinatura personalizada Premium */}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-3 justify-center w-full max-w-md">
         <button
           type="button"
           onClick={handleDownload}
           disabled={loading || !imgBlob}
-          className="btn-soft px-5 py-2.5 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-3 rounded-full font-medium bg-stone-800 text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Baixar
+          <Download size={18} />
+          Baixar Imagem
         </button>
+        
         <button
           type="button"
           onClick={handleShare}
           disabled={loading || !imgBlob}
-          className="btn-soft px-5 py-2.5 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-3 rounded-full font-medium bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
+          <Share2 size={18} />
           Compartilhar
         </button>
+
         <button
           type="button"
-          onClick={handleOpenImage}
+          onClick={handleDownload}
           disabled={loading || !imgBlob}
-          className="btn-soft px-5 py-2.5 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-3 rounded-full font-medium bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Abrir imagem
+          <Instagram size={18} />
+          Baixar p/ Instagram
         </button>
       </div>
 
       {status && (
-        <p className="text-center text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="text-center text-xs text-stone-500 max-w-xs">
           {status}
         </p>
       )}
 
-      {imgUrl && (
-        <img
-          src={imgUrl}
-          alt="Preview da mensagem"
-          className="mt-2 w-full max-w-[220px] rounded-lg border border-[hsl(var(--border))]"
-        />
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-2xl backdrop-blur-sm z-10">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-800 rounded-full animate-spin" />
+            <span className="text-sm font-medium text-stone-600">Gerando imagem...</span>
+          </div>
+        </div>
       )}
     </div>
   );

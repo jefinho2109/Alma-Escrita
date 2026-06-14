@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
+  
   IMPACT_QUOTES,
   MESSAGES,
   MOODS,
@@ -142,12 +143,10 @@ function applyGreeting(greeting: string, text: string): string {
   const cleaned = stripLeadingGreeting(text);
   return `${greeting}, ${cleaned.charAt(0).toLowerCase()}${cleaned.slice(1)}`;
 }
-
 function pickDaily(dateKey: string): Message {
   const idx = hashString(dateKey) % MESSAGES.length;
   return MESSAGES[idx];
 }
-
 function categoryEmoji(c: Category): string {
   switch (c) {
     case "Amor": return "❤";
@@ -1589,7 +1588,7 @@ function App() {
                         </p>
                         <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
                           <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                            {g.mood} · {g.recipient}
+                            {g.tone} · {g.recipient}
                           </span>
                           <div className="flex gap-2 flex-wrap">
                             <button

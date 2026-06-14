@@ -3,6 +3,7 @@ import {
   AUTHOR_VOICE_SEEDS,
   AUTHOR_VOICE_STATS,
   GENERIC_PHRASE_BLOCKLIST,
+  GOLDEN_SEEDS,
   buildAuthorVoiceContext,
   findAuthorVoiceSeeds,
   type AuthorVoiceSeed,
@@ -39,6 +40,18 @@ const BLOCKED_PHRASES = [
   "eu precisava transformar em palavra",
   "que estas palavras cheguem como abraço",
   "quando a alma fala com amor",
+  "é importante lembrar",
+  "nesta jornada",
+  "te convido a refletir",
+  "a vida é uma montanha-russa",
+  "no final, tudo dá certo",
+  "acredite no seu potencial",
+  "você é capaz de conquistar",
+  "siga em frente",
+  "nunca desista dos seus sonhos",
+  "o universo conspira a seu favor",
+  "tudo tem um motivo",
+  "confie no processo",
 ] as const;
 
 const simpleTextCorrections: Array<[RegExp, string]> = [
@@ -504,22 +517,27 @@ function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: 
   return pick(variants, rng);
 }
 
+function buildGoldenFallbackSentence(data: GenRequest, rng: () => number): string {
+  const golden = GOLDEN_SEEDS[Math.floor(rng() * GOLDEN_SEEDS.length)]!;
+  const variants = [
+    golden.reflection,
+    golden.impact,
+    `A ${golden.theme.split(" ")[0].toLowerCase()} não é sobre perfeição, é sobre ${golden.vocabulary.slice(0, 2).join(" e ")}.`,
+  ];
+  return pick(variants, rng);
+}
+
 function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
   const data = prepareRequest(request);
   const selected = seeds.length > 0 ? seeds : selectAuthorSeeds(data);
   const rng = createRng(`${data.generationId}-fallback`);
   const retryRng = createRng(`${data.generationId}-fallback-retry`);
   const style = styleForGeneration(data.generationId || createGenerationId());
-  if (selected.length === 0) {
-    console.warn(
-      "[Alma Escrita] Não encontrei sinais de livros carregados para esta geração; fallback temporário variado ativado.",
-    );
-  }
-
+  
   const sentences = [
     buildOpening(data, rng, style),
-    buildSeedSentence(selected[0], data, rng, style, Math.floor(rng() * 6)),
-    buildSeedSentence(selected[1], data, rng, style, Math.floor(rng() * 6) + 1),
+    selected[0] ? buildSeedSentence(selected[0], data, rng, style, Math.floor(rng() * 6)) : buildGoldenFallbackSentence(data, rng),
+    selected[1] ? buildSeedSentence(selected[1], data, rng, style, Math.floor(rng() * 6) + 1) : buildGoldenFallbackSentence(data, rng),
     pick(bridgeSentences, rng),
     buildClosing(selected[2], data, rng),
   ];
@@ -537,7 +555,7 @@ function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
         [
           buildOpening(data, retryRng, style),
           pick(styleSentences[style], retryRng),
-          buildSeedSentence(selected[3], data, retryRng, style, Math.floor(retryRng() * 6) + 2),
+          selected[3] ? buildSeedSentence(selected[3], data, retryRng, style, Math.floor(retryRng() * 6) + 2) : buildGoldenFallbackSentence(data, retryRng),
           buildClosing(selected[4], data, retryRng),
         ]
           .slice(0, count)
@@ -567,7 +585,10 @@ export async function generateBookBasedMessage(
   ).join("\n");
 
   const prompt = `
-Você é a voz autoral do app Alma Escrita Oficial, inspirado nos livros de Jefferson Poeta Sonhador.
+Você é a voz autoral do app Alma Escrita Oficial, encarnando a identidade do Poeta Sonhador.
+
+MANIFESTO DO POETA SONHADOR:
+Sua escrita é íntima, serena e visceral. Você não dá conselhos genéricos; você valida a dor antes de oferecer esperança. Sua estrutura invisível é o FFP: a Fé que planta a intenção, a Força que executa o pequeno passo, e a Paciência que protege o processo contra a ansiedade do resultado. Use assimetria intencional: intercale frases longas e fluidas com frases curtas e contundentes. Trate cicatrizes como "costuras da alma" e recomeços como "sabedoria de quem já sobreviveu ao fim". Nunca use slogans motivacionais ou clichês de autoajuda.
 
 Gere UMA mensagem personalizada, original, profunda, emocional e pronta para compartilhar.
 
@@ -583,7 +604,7 @@ Dados do pedido:
 
 Base autoral ampliada extraída dos livros e poemas do projeto:
 - Total de sinais autorais disponíveis no app: ${AUTHOR_VOICE_STATS.totalSeeds}
-- Use os sinais abaixo como identidade literária, não como texto para copiar.
+- Use os sinais abaixo como identidade literária, não como texto para copiar literalmente.
 
 ${authorContext}
 
@@ -592,7 +613,7 @@ Método autoral obrigatório:
 - Não reaproveite abertura, desenvolvimento nem encerramento das mensagens anteriores.
 - Use o ID único da geração como semente criativa para variar vocabulário, ritmo, imagens e estrutura.
 - Obedeça ao estilo alternado desta versão: ${style}.
-- Use FFP quando houver luta, espera, fé, recomeço ou cansaço: Fé, Força e Paciência.
+- Incorpore o FFP (Fé, Força, Paciência) como a espinha dorsal invisível da mensagem, não como um slogan no final.
 - Comece por uma verdade emocional concreta, como quem escreve carta, desabafo ou reflexão íntima.
 - Aprofunde dor, fé, identidade, silêncio, recomeço, propósito ou saudade conforme o pedido.
 - Traga imagem de alma, hoje, caminho, queda, cicatriz, oração, silêncio, presença ou reconstrução quando fizer sentido.
@@ -614,7 +635,7 @@ Regras de escrita:
 - Não invente fatos concretos que o usuário não informou.
 - Entregue somente o texto final.
 
-Frases proibidas:
+Frases proibidas (bloqueio rigoroso):
 ${blockedPhrases}
 `.trim();
 

@@ -10428,3 +10428,41 @@ export function buildAuthorVoiceContext(seeds: AuthorVoiceSeed[]): string {
     ].join("\n"))
     .join("\n\n");
 }
+
+/**
+ * Sementes de Ouro (Golden Seeds)
+ * Trechos curados manualmente que representam a essência pura do Poeta Sonhador.
+ * Usados para calibrar a IA e fortalecer o fallback local com máxima fidelidade autoral.
+ */
+export const GOLDEN_SEEDS = [
+  {
+    theme: "FFP (Fé, Força, Paciência)",
+    reflection: "A fé não é a certeza de que tudo vai dar certo, mas a coragem de continuar caminhando mesmo quando o chão parece desaparecer. A força é o pequeno passo que você dá. A paciência é o amor com que você espera o fruto amadurecer, sem arrancá-lo verde.",
+    impact: "FFP não é um slogan. É o ciclo invisível que sustenta quem decidiu não desistir de si mesmo.",
+    vocabulary: ["fé", "força", "paciência", "passo", "amadurecer", "ciclo", "sustentar"]
+  },
+  {
+    theme: "Cicatrizes e Superação",
+    reflection: "Suas cicatrizes não são marcas de quebra. São costuras de ouro. Elas contam a história silenciosa de quem decidiu ficar e reconstruir a própria casa, tijolo por tijolo, mesmo depois do terremoto.",
+    impact: "A pele lembra, mas a alma aprendeu a dançar com as marcas.",
+    vocabulary: ["cicatrizes", "costuras", "ouro", "reconstruir", "terremoto", "pele", "alma"]
+  },
+  {
+    theme: "Recomeços",
+    reflection: "Recomeçar não é apagar o passado ou voltar ao zero. É pegar todas as lições que a dor te ensinou e usá-las como mapa para um novo caminho. Você não está começando do nada; está começando com a sabedoria de quem já sobreviveu ao fim.",
+    impact: "O recomeço é a arte de usar as ruínas como alicerce.",
+    vocabulary: ["recomeçar", "mapa", "sabedoria", "sobreviveu", "ruínas", "alicerce", "novo"]
+  },
+  {
+    theme: "Amor e Presença",
+    reflection: "O amor verdadeiro não grita, não exige e não faz de conta que é perfeito. Ele chega no silêncio das manhãs, se acomoda no peito e transforma o ordinário em poesia. É presença que fica, mesmo quando as palavras faltam.",
+    impact: "Amar é reconhecer morada no coração de alguém e cuidar do silêncio entre uma palavra e outra.",
+    vocabulary: ["amor", "silêncio", "presença", "morada", "coração", "poesia", "cuidar"]
+  },
+  {
+    theme: "Esperança e Tristeza",
+    reflection: "A esperança não é otimismo cego que ignora a dor. É a teimosia serena de acreditar que o amanhã merece ser visto, mesmo que hoje o peito pese. A tristeza é permitida; ela é a chuva que rega a terra para que algo novo possa brotar.",
+    impact: "Chorar não é fraqueza. É a alma lavando o rosto para enxergar a luz com mais clareza.",
+    vocabulary: ["esperança", "teimosia", "serena", "tristeza", "chuva", "brota", "luz"]
+  }
+] as const;

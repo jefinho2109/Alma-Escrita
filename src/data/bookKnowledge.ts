@@ -34,7 +34,7 @@ export const BOOK_SEEDS: BookSeed[] = [
   {
     id: "afh-gratidao-1",
     book: "A Força do Hoje",
-    categories: ["Gratidão", "Bom dia", "Boa Tarde", "Boa noite"],
+    categories: ["Gratidão", "Bom dia", "Boa noite"],
     moods: ["Grato", "Feliz"],
     themes: ["gratidão", "vida", "pequenos milagres", "presença"],
     essence:
@@ -74,7 +74,7 @@ export const BOOK_SEEDS: BookSeed[] = [
   {
     id: "di-jornada-1",
     book: "Desafiando o Impossível",
-    categories: ["Superação", "Recomeço", "Reflexão"],
+    categories: ["Superação", "Recomeço", "Tristeza"],
     moods: ["Triste", "Sem força"],
     themes: ["jornada", "queda", "aprendizado", "vitória"],
     essence:
@@ -94,7 +94,7 @@ export const BOOK_SEEDS: BookSeed[] = [
   {
     id: "ensqvp-silencio-1",
     book: "Eu Não Sou Quem Você Pensa",
-    categories: ["Tristeza", "Superação", "Saudade"],
+    categories: ["Tristeza", "Superação", "Amizade"],
     moods: ["Triste", "Sem força"],
     themes: ["silêncio", "dor escondida", "verdade", "acolhimento"],
     essence:
@@ -104,7 +104,7 @@ export const BOOK_SEEDS: BookSeed[] = [
   {
     id: "ensqvp-verdade-1",
     book: "Eu Não Sou Quem Você Pensa",
-    categories: ["Recomeço", "Superação", "Reflexão"],
+    categories: ["Recomeço", "Superação", "Tristeza"],
     moods: ["Triste", "Ansioso"],
     themes: ["verdade", "identidade", "cura", "recomeço"],
     essence:
@@ -124,7 +124,7 @@ export const BOOK_SEEDS: BookSeed[] = [
   {
     id: "ensqvp-amor-proprio-1",
     book: "Eu Não Sou Quem Você Pensa",
-    categories: ["Amor", "Recomeço", "Mãe", "Família"],
+    categories: ["Amor", "Recomeço", "Amizade"],
     moods: ["Triste", "Grato"],
     themes: ["amor próprio", "verdade", "alma", "reencontro"],
     essence:

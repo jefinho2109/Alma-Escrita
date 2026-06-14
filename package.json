@@ -7,6 +7,9 @@
   },  "private": true,
   "license": "MIT",
   "type": "module",
+  "dependencies": {
+    "firebase": "^12.13.0"
+  },
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
