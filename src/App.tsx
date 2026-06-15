@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
-  
   IMPACT_QUOTES,
   MESSAGES,
   MOODS,
@@ -155,7 +154,9 @@ function applyGreeting(greeting: string, text: string): string {
 function pickDaily(dateKey: string): Message {
   const idx = hashString(dateKey) % MESSAGES.length;
   return MESSAGES[idx];
-}function categoryEmoji(c: Category): string {
+}
+
+function categoryEmoji(c: Category): string {
   switch (c) {
     case "Amor": return "❤";
     case "Motivação": return "✦";
@@ -449,14 +450,18 @@ function App() {
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
+    
+    // A relação é a única fonte de verdade para o destinatário no pipeline
+    const targetRecipient = (genForm.relationship?.toLowerCase() || "outro") as GenRecipient;
+    
     const request = {
       name: genForm.name,
       senderName: genForm.senderName || undefined,
-      relationship: (genForm.relationship as any) || undefined,
-      occasion: (genForm.occasion as any) || undefined,
+      relationship: (genForm.relationship as GenRelationship) || undefined,
+      occasion: (genForm.occasion as GenOccasion) || undefined,
       sharedMemory: genForm.sharedMemory || undefined,
       intention: genForm.intention ?? "",
-      recipient: genForm.recipient ?? "amor",
+      recipient: targetRecipient,
       tone: genForm.tone ?? "emocionante",
       length: genForm.length ?? "média",
     };
@@ -1553,28 +1558,6 @@ function App() {
                     {GEN_TONES.map((m) => (
                       <option key={m} value={m}>
                         {m.charAt(0).toUpperCase() + m.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Para quem é a mensagem?
-                  </span>
-                  <select
-                    value={genForm.recipient}
-                    onChange={(e) =>
-                      setGenForm({
-                        ...genForm,
-                        recipient: e.target.value as GenRecipient,
-                      })
-                    }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
-                  >
-                    {GEN_RECIPIENTS.map((r) => (
-                      <option key={r} value={r}>
-                        {r.charAt(0).toUpperCase() + r.slice(1)}
                       </option>
                     ))}
                   </select>
