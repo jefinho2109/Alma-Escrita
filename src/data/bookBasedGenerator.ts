@@ -527,12 +527,25 @@ function pickSeedImage(seed: AuthorVoiceSeed, rng: () => number): string {
   );
 }
 
-function isEmotionalAnchor(text: string): boolean {
-  const normalized = text.toLowerCase();
-  // Se for curto e contiver declarações diretas, é uma âncora emocional, não um relato de fato.
-  const isShort = text.split(/\s+/).length < 15;
-  const hasDeclaration = /você é|amo|sou grato|me faz feliz|motivo do meu|te amo/i.test(normalized);
-  return isShort && hasDeclaration;
+function classifySharedMemory(text: string): "memory" | "advice" | "declaration" | "other" {
+  const lower = text.toLowerCase();
+  
+  // Indicadores de conselho/motivação (imperativos, incentivos)
+  if (/não desista|acredite|continue|força|lute|supere|não desanime|siga em frente|confie|nunca desista/i.test(lower)) {
+    return "advice";
+  }
+  
+  // Indicadores de declaração afetiva direta
+  if (/você é|amo|sou grato|me faz feliz|motivo do meu|te amo/i.test(lower)) {
+    return "declaration";
+  }
+  
+  // Indicadores de memória concreta (passado, eventos específicos)
+  if (/quando|lembr|aquele dia|vez que|no dia|quando você/i.test(lower)) {
+    return "memory";
+  }
+  
+  return "other";
 }
 
 function buildSeedSentence(
@@ -544,16 +557,30 @@ function buildSeedSentence(
 ): string {
   if (!seed) return pick(bridgeSentences, rng);
 
-  // REGRA DE OURO: Tratar detalhes emocionais como âncora, sem inventar fatos.
+  // REGRA DE OURO: Classificar o tipo de detalhe informado para evitar inserção literal em templates inadequados.
   if (data.sharedMemory) {
-    if (isEmotionalAnchor(data.sharedMemory)) {
-      const anchorVariants = [
+    const memoryType = classifySharedMemory(data.sharedMemory);
+    
+    if (memoryType === "advice") {
+      const adviceVariants = [
+        `Quero lembrar você de que ${data.sharedMemory}.`,
+        `Leve sempre comigo este pensamento: ${data.sharedMemory}.`,
+        `Espero que você nunca esqueça: ${data.sharedMemory}.`,
+        `Que estas palavras sirvam para reforçar: ${data.sharedMemory}.`,
+      ];
+      return pick(adviceVariants, rng);
+    }
+    
+    if (memoryType === "declaration") {
+      const declarationVariants = [
         `Tem uma verdade simples que carrego comigo: ${data.sharedMemory}.`,
         `Sempre levo no peito a certeza de que ${data.sharedMemory}.`,
         `Guardo como um tesouro o fato de que ${data.sharedMemory}.`,
       ];
-      return pick(anchorVariants, rng);
-    } else {
+      return pick(declarationVariants, rng);
+    }
+    
+    if (memoryType === "memory") {
       const factVariants = [
         `Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`,
         `Quando penso em ${data.sharedMemory}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
@@ -561,6 +588,14 @@ function buildSeedSentence(
       ];
       return pick(factVariants, rng);
     }
+
+    // Fallback para "other" (tratamento genérico mas seguro, sem assumir que é um fato concreto)
+    const otherVariants = [
+      `Levo sempre comigo que ${data.sharedMemory}.`,
+      `Quero que saiba que ${data.sharedMemory}.`,
+      `Este pensamento guia o que sinto: ${data.sharedMemory}.`,
+    ];
+    return pick(otherVariants, rng);
   }
 
   // CORREÇÃO DEFINITIVA: Removido o uso de seed.impact e seed.reflection para evitar injeção de frases prontas dos livros.
