@@ -418,6 +418,7 @@ function selectAuthorSeeds(data: GenRequest): AuthorVoiceSeed[] {
     intention: `${data.intention} ${inferCategory(data.intention, data.tone)}`,
     tone: data.tone,
     recipient: targetRecipient,
+    sharedMemory: data.sharedMemory, // PASSANDO A MEMÓRIA PARA O SCORE
     limit: 24,
   });
 
@@ -535,7 +536,6 @@ function buildSeedSentence(
   const impact = stripFinalPunctuation(seed.impact);
   const styleLine = pick(styleSentences[style], rng);
 
-  // Usa termos seguros em vez de injetar o tema bruto da seed como sujeito da frase
   const variants = [
     `A imagem de ${image} me lembra que ${lowerFirst(reflection)}, e hoje isso ganha o tamanho de ${feeling}.`,
     `Entre o cuidado e a ${emotion}, eu escolho uma presença que valoriza cada momento ao seu lado.`,
@@ -544,6 +544,11 @@ function buildSeedSentence(
     `Nossa conexão não é uma ideia distante; aparece como gesto, como cuidado e como apoio real no dia a dia.`,
     styleLine,
   ];
+
+  // REGRA DE OURO: Se existe memória compartilhada, ela DEVE ser a variante prioritária no fallback
+  if (data.sharedMemory) {
+    variants.unshift(`Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`);
+  }
 
   return variants[index % variants.length];
 }
@@ -621,18 +626,15 @@ export async function generateBookBasedMessage(
   };
   const category = inferCategory(data.intention, data.tone);
   
-  // LOGS TEMPORÁRIOS PARA DEPURAÇÃO DE RELACIONAMENTO
-  console.log("[DEBUG ALMA ESCRITA] Relação recebida (relationship):", data.relationship);
-  console.log("[DEBUG ALMA ESCRITA] Destinatário normalizado (recipient):", data.recipient);
-  console.log("[DEBUG ALMA ESCRITA] Alvo para filtro de seeds:", (data.relationship || data.recipient).toLowerCase());
+  // LOGS DE PIPELINE PARA DEPURAÇÃO DE ESPECIFICIDADE
+  console.log("[DEBUG PIPELINE] Relacionamento:", data.relationship || data.recipient);
+  console.log("[DEBUG PIPELINE] Ocasião:", data.occasion || data.intention);
+  console.log("[DEBUG PIPELINE] Memória recebida do formulário:", data.sharedMemory || "Nenhuma");
   
   const seeds = selectAuthorSeeds(data);
   
-  console.log("[DEBUG ALMA ESCRITA] Seeds selecionadas (top 3):", seeds.slice(0, 3).map(s => ({
-    id: s.id,
-    themes: s.themes,
-    recipients: s.recipients
-  })));
+  console.log("[DEBUG PIPELINE] Seeds selecionadas (top 3 IDs):", seeds.slice(0, 3).map(s => s.id));
+  console.log("[DEBUG PIPELINE] Memória enviada ao prompt:", data.sharedMemory ? `"${data.sharedMemory}"` : "Foco na essência");
 
   const authorContext = buildAuthorVoiceContext(seeds);
   const generationId = data.generationId || createGenerationId();
@@ -664,12 +666,12 @@ REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
    - CERTO: "Alessandra, uma das coisas que mais admiro em você é a forma como consegue trazer calma aos dias difíceis."
    - ERRADO: "Entrego esta mensagem como oração pequena..."
    - CERTO: "Quando penso nos momentos que vivemos, lembro da força e da bondade que você demonstra nas pequenas atitudes."
-5. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencioná-lo ou aludir a ele de forma concreta no corpo do texto.
-6. PRIORIZE FATOS CONCRETOS sobre abstrações.
-   - ERRADO: "o amor aparece como caminho possível"
-   - CERTO: "você esteve ao meu lado quando eu mais precisei"
-   - ERRADO: "amizade como gesto"
-   - CERTO: "você me ouviu quando ninguém mais ouviu"
+ 5. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencionar elementos concretos dela (locais, ações, situações, objetos) no corpo do texto.
+ 6. SCORE DE ESPECIFICIDADE: Se houver memória, é PROIBIDO usar apenas palavras abstratas como "presença", "carinho", "afeto", "ternura", "cuidado" ou "sentimento" sem conectá-las a um fato concreto da memória.
+    - ERRADO (Genérico): "Alessandra, lembro com carinho dos momentos em que sua força me ajudou." (Serve para qualquer um)
+    - CERTO (Específico): "Alessandra, lembro-me concretamente de quando você me visitava todos os dias no hospital. Naquele período difícil, sua presença foi meu porto seguro."
+    - ERRADO: "amizade como gesto"
+    - CERTO: "você me ouviu quando ninguém mais ouviu"
 
 Gere UMA resposta direta, profunda, emocional e pronta para compartilhar.
 

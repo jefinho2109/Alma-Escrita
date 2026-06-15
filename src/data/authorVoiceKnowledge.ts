@@ -37,6 +37,7 @@ export interface AuthorVoiceQuery {
   intention?: string;
   tone?: string;
   recipient?: string;
+  sharedMemory?: string;
   limit?: number;
 }
 
@@ -10377,7 +10378,7 @@ const toneThemeMap: Record<string, string[]> = {
   reflexao: ["identidade", "silêncio", "transformação"],
 };
 
-function scoreSeed(seed: AuthorVoiceSeed, query: Required<AuthorVoiceQuery>): number {
+function scoreSeed(seed: AuthorVoiceSeed, query: Required<AuthorVoiceQuery & { sharedMemory?: string }>): number {
   const haystack = normalize([
     query.intention,
     query.tone,
@@ -10398,6 +10399,7 @@ function scoreSeed(seed: AuthorVoiceSeed, query: Required<AuthorVoiceQuery>): nu
   for (const emotion of seed.emotions) {
     if (normalize(query.intention).includes(normalize(emotion))) score += 5;
   }
+  
   const recipientMatch = seed.recipients.some((item) => 
     normalize(query.recipient).includes(normalize(item)) || 
     normalize(item).includes(normalize(query.recipient))
@@ -10406,7 +10408,6 @@ function scoreSeed(seed: AuthorVoiceSeed, query: Required<AuthorVoiceQuery>): nu
   if (recipientMatch) {
     score += 10;
   } else if (query.recipient && seed.recipients.length > 0) {
-    // Penalização pesada se a seed tiver um destinatário específico que contradiz o pedido (ex: seed de "pai" quando o pedido é "amiga")
     const hardMismatch = seed.recipients.some(item => 
       ["pai", "mãe", "filho", "filha", "esposa", "marido", "namorado", "namorada"].includes(normalize(item))
     );
@@ -10414,6 +10415,22 @@ function scoreSeed(seed: AuthorVoiceSeed, query: Required<AuthorVoiceQuery>): nu
       score -= 50;
     }
   }
+
+  // NOVO: Score de Especificidade da Memória
+  if (query.sharedMemory) {
+    const memoryWords = normalize(query.sharedMemory).split(/\s+/).filter(w => w.length > 3);
+    let memoryMatches = 0;
+    for (const word of memoryWords) {
+      if (haystack.includes(word)) {
+        memoryMatches += 1;
+      }
+    }
+    // Bônus massivo para seeds que compartilham vocabulário com a memória concreta
+    if (memoryMatches > 0) {
+      score += 20 * memoryMatches;
+    }
+  }
+
   if (seed.kind === "ffp" && /fe|motivacional|reflexao/.test(normalize(query.tone))) score += 5;
   if (seed.kind === "recipient" && seed.recipients.length > 0) score += 2;
   return score;
@@ -10424,6 +10441,7 @@ export function findAuthorVoiceSeeds(query: AuthorVoiceQuery): AuthorVoiceSeed[]
     intention: query.intention || "",
     tone: query.tone || "",
     recipient: query.recipient || "",
+    sharedMemory: query.sharedMemory || "",
     limit: query.limit || 9,
   };
 
