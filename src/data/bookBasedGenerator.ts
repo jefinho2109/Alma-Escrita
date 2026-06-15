@@ -642,6 +642,24 @@ function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
     : text;
 }
 
+function buildApologyFallback(data: GenRequest): string {
+  const name = data.name ? data.name : "você";
+  
+  const sentence1 = `${name}, quero reconhecer que errei e peço perdão por isso.`;
+  const sentence2 = `Assumo minha responsabilidade e sinto arrependimento pelo que aconteceu.`;
+  
+  let sentences = [sentence1, sentence2];
+  
+  if (data.sharedMemory) {
+    sentences.push(`Sei que minhas ações afetaram ${data.sharedMemory}, e peço desculpas de coração por ter ferido nossa confiança.`);
+  } else {
+    sentences.push(`Peço desculpas de coração e espero que, com o tempo, possamos reconstruir o que foi abalado.`);
+  }
+  
+  const count = data.length === "curta" ? 2 : data.length === "média" ? 3 : 4;
+  return cleanGeneratedText(sentences.slice(0, count).join(" "));
+}
+
 export async function generateBookBasedMessage(
   request: GenRequest,
 ): Promise<string> {
@@ -729,14 +747,54 @@ ${blockedPhrases}
 `.trim();
 
   try {
-    const aiText = cleanGeneratedText(await generateAIMsg(prompt));
-    const finalText = containsGenericPhrase(aiText) ||
-      isTooSimilarToPrevious(aiText, data.previousMessages)
-      ? buildFallback(data, seeds)
-      : aiText;
+    let aiText = cleanGeneratedText(await generateAIMsg(prompt));
+    
+    // VALIDAÇÃO DE NEGÓCIO: Pedido de Desculpas
+    const isApology = /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.occasion || "") || 
+                      /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.intention || "");
+    
+    let finalText = aiText;
+    let validationResult = "aprovado";
+
+    if (isApology) {
+      const lowerText = finalText.toLowerCase();
+      const requiredTerms = ["desculpa", "perdão", "errei", "erro", "arrependimento", "responsabilidade"];
+      const matchCount = requiredTerms.filter(term => lowerText.includes(term)).length;
+      
+      if (matchCount < 2) {
+        validationResult = "reprovado";
+        console.log("[VALIDACAO_OCASIAO]");
+        console.log("occasion:", data.occasion || data.intention);
+        console.log("texto_final:", finalText);
+        console.log("resultado:", validationResult);
+        
+        // Usar fallback específico de pedido de desculpas
+        finalText = buildApologyFallback(data);
+      } else {
+        console.log("[VALIDACAO_OCASIAO]");
+        console.log("occasion:", data.occasion || data.intention);
+        console.log("texto_final:", finalText);
+        console.log("resultado:", validationResult);
+      }
+    }
+
+    // Verificação final de frases genéricas ou similaridade
+    if (containsGenericPhrase(finalText) || isTooSimilarToPrevious(finalText, data.previousMessages)) {
+       if (isApology) {
+           finalText = buildApologyFallback(data);
+       } else {
+           finalText = buildFallback(data, seeds);
+       }
+    }
+
     return rememberGeneratedMessage(finalText);
   } catch (error) {
     console.warn("IA indisponível, usando base autoral local:", error);
+    const isApology = /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.occasion || "") || 
+                      /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.intention || "");
+    if (isApology) {
+        return rememberGeneratedMessage(buildApologyFallback(data));
+    }
     return rememberGeneratedMessage(buildFallback(data, seeds));
   }
 }
