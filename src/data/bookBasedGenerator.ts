@@ -52,6 +52,26 @@ const BLOCKED_PHRASES = [
   "o universo conspira a seu favor",
   "tudo tem um motivo",
   "confie no processo",
+  "há sentimentos que ficam maiores quando são escritos com alma",
+  "o tom que nasce aqui",
+  "amizade não aparece aqui como ideia distante",
+  "caminho possível",
+  "forma de dizer presença",
+  "lugar especial",
+  "ilumina os dias",
+  "esta mensagem",
+  "estas palavras",
+  "texto",
+  "tom",
+  "narrativa",
+  "escrevo",
+  "escrita",
+  "mensagem",
+  "palavras",
+  "poesia",
+  "o que tento dizer",
+  "entrego estas palavras",
+  "não escrevo para impressionar",
 ] as const;
 
 const simpleTextCorrections: Array<[RegExp, string]> = [
@@ -83,10 +103,10 @@ const fallbackOpenings = {
     "Tem dias em que a alma só precisa ser tratada com presença.",
   ],
   named: [
-    "que estas palavras cheguem sem pressa, mas com presença inteira.",
-    "eu transformo este sentimento em cuidado, porque palavra sincera também é abrigo.",
-    "há sentimentos que ficam maiores quando são escritos com alma.",
-    "eu escrevo com a delicadeza de quem quer tocar sem invadir e permanecer sem pesar.",
+    "que este carinho chegue sem pressa, mas com presença inteira.",
+    "transformo este sentimento em cuidado, porque afeto sincero também é abrigo.",
+    "há laços que ficam maiores quando a vida nos testa de verdade.",
+    "trago no peito a delicadeza de quem quer tocar sem invadir e permanecer sem pesar.",
   ],
 };
 
@@ -95,15 +115,15 @@ const bridgeSentences = [
   "Dentro desse sentimento existe cuidado, existe escolha e existe uma forma bonita de permanecer.",
   "A vida me ensinou que o que é profundo não precisa repetir caminhos: encontra uma forma nova de chegar.",
   "Entre o que a alma sente e o que a boca consegue dizer, escolho te entregar presença.",
-  "Que cada palavra carregue mais do que som: carregue intenção, memória boa e carinho vivo.",
+  "Que cada gesto carregue mais do que som: carregue intenção, memória boa e carinho vivo.",
 ];
 
 const closingSentences = [
   "Que fique em você o essencial: meu carinho é presença, não aparência.",
   "Receba isso como quem recebe uma oração mansa: com verdade, cuidado e paz.",
-  "E que o seu coração entenda o que minhas palavras só conseguem começar.",
+  "E que o seu coração entenda o que o meu afeto só consegue começar.",
   "Fica aqui meu afeto, simples por fora e profundo por dentro.",
-  "Que esta mensagem encontre em você um lugar bonito para permanecer.",
+  "Que este carinho encontre em você um lugar bonito para permanecer.",
 ];
 
 const variationStyles = [
@@ -145,7 +165,7 @@ const styleSentences: Record<VariationStyle, string[]> = {
     "Que esta palavra levante algo bom dentro de você, como força serena para seguir com o coração mais leve.",
   ],
   "carta curta": [
-    "Escrevo como carta breve: poucas linhas, mas uma intenção inteira atravessando cada frase.",
+    "Deixo aqui poucas linhas, mas com uma intenção inteira atravessando cada frase.",
     "Se eu pudesse resumir tudo, diria que meu cuidado por você merece chegar limpo, direto e verdadeiro.",
   ],
   "declaração intensa": [
@@ -587,45 +607,58 @@ export async function generateBookBasedMessage(
   const prompt = `
 Você é a voz autoral do app Alma Escrita Oficial, encarnando a identidade do Poeta Sonhador.
 
-MANIFESTO DO POETA SONHADOR:
-Sua escrita é íntima, serena e visceral. Você não dá conselhos genéricos; você valida a dor antes de oferecer esperança. Sua estrutura invisível é o FFP: a Fé que planta a intenção, a Força que executa o pequeno passo, e a Paciência que protege o processo contra a ansiedade do resultado. Use assimetria intencional: intercale frases longas e fluidas com frases curtas e contundentes. Trate cicatrizes como "costuras da alma" e recomeços como "sabedoria de quem já sobreviveu ao fim". Nunca use slogans motivacionais ou clichês de autoajuda.
+HIERARQUIA ABSOLUTA DE CONTEÚDO:
+1. Remetente: ${data.senderName || "Alguém que te quer bem"}
+2. Destinatário: ${data.name || data.recipient}
+3. Relacionamento: ${data.relationship || data.recipient}
+4. Ocasião: ${data.occasion || data.intention}
+5. Memória compartilhada: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
+6. Voz Poeta Sonhador: APENAS o estilo (ritmo, metáforas concretas), NUNCA o assunto.
 
-Gere UMA mensagem personalizada, original, profunda, emocional e pronta para compartilhar.
+REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA):
+1. A IA NÃO EXISTE. Você é o Remetente falando diretamente com o Destinatário.
+2. NUNCA fale sobre o ato de escrever. É estritamente proibido usar: "escrevo", "escrita", "mensagem", "palavras", "texto", "poesia", "o que tento dizer", "esta mensagem", "entrego estas palavras", "não escrevo para impressionar".
+3. NUNCA descreva o tom ou o processo. Proibido: "o tom que nasce aqui", "espiritual, íntimo, esperançoso", "esta versão", "esta reflexão", "esta homenagem", "tom", "narrativa".
+4. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencioná-lo ou aludir a ele de forma concreta no corpo do texto. Não diga apenas "lembro daquela vez", descreva a cena ou o sentimento daquela cena.
+5. PRIORIZE FATOS CONCRETOS sobre abstrações.
+   - ERRADO: "o amor aparece como caminho possível"
+   - CERTO: "você esteve ao meu lado quando eu mais precisei"
+   - ERRADO: "amizade como gesto"
+   - CERTO: "você me ouviu quando ninguém mais ouviu"
+   - ERRADO: "Você ocupa um lugar especial e sua presença ilumina os dias."
+   - CERTO: "Eu ainda lembro daquela tarde em que você ficou horas me ouvindo quando eu não sabia o que fazer. Naquele dia percebi o tamanho do seu coração."
+
+Gere UMA resposta direta, profunda, emocional e pronta para compartilhar.
 
 Dados do pedido:
-- Esta mensagem é para: ${destinationFor(data)}
-- Nome da pessoa: ${data.name || "não informado"}
-- O que o usuário quer dizer: ${data.intention || "transformar um sentimento simples em uma mensagem bonita e verdadeira"}
+- Quem envia: ${data.senderName || "Alguém que te quer bem"}
+- Quem recebe: ${data.name || data.recipient}
+- Relação: ${data.relationship || data.recipient}
+- Ocasião: ${data.occasion || data.intention}
+- Memória ou detalhe especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
 - Tom escolhido: ${data.tone}
 - Tamanho escolhido: ${data.length} (${lengthGuidance[data.length]})
 - Categoria emocional inferida: ${category}
 - ID único desta geração: ${generationId}
-- Estilo alternado obrigatório desta versão: ${style}
 
 Base autoral ampliada extraída dos livros e poemas do projeto:
 - Total de sinais autorais disponíveis no app: ${AUTHOR_VOICE_STATS.totalSeeds}
-- Use os sinais abaixo como identidade literária, não como texto para copiar literalmente.
+- Use os sinais abaixo APENAS como identidade literária (ritmo, metáforas concretas), NUNCA como texto para copiar.
 
 ${authorContext}
 
 Método autoral obrigatório:
-- Gere uma nova versão, diferente das anteriores, mesmo quando nome e mensagem base forem iguais.
-- Não reaproveite abertura, desenvolvimento nem encerramento das mensagens anteriores.
-- Use o ID único da geração como semente criativa para variar vocabulário, ritmo, imagens e estrutura.
-- Obedeça ao estilo alternado desta versão: ${style}.
-- Incorpore o FFP (Fé, Força, Paciência) como a espinha dorsal invisível da mensagem, não como um slogan no final.
-- Comece por uma verdade emocional concreta, como quem escreve carta, desabafo ou reflexão íntima.
-- Aprofunde dor, fé, identidade, silêncio, recomeço, propósito ou saudade conforme o pedido.
-- Traga imagem de alma, hoje, caminho, queda, cicatriz, oração, silêncio, presença ou reconstrução quando fizer sentido.
-- Termine com uma frase marcante, madura e humana.
+- Comece DIRETAMENTE tratando a pessoa pelo nome ou pelo vínculo, sem introduções genéricas.
+- Se houver uma memória especial, faça dela o coração da mensagem. Use os detalhes fornecidos de forma orgânica e concreta.
+- Incorpore o FFP (Fé, Força, Paciência) como a espinha dorsal invisível da mensagem, não como um slogan.
+- Termine com uma frase marcante, madura e humana, reafirmando o vínculo.
 
 Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas de perto:
 ${previousMessages || "- nenhuma nesta sessão"}
 
 Regras de escrita:
 - Escreva em português do Brasil.
-- Escreva em primeira pessoa quando for mensagem personalizada.
-- Fale diretamente com a pessoa quando houver destinatário.
+- Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você).
 - Não use tom de autoajuda genérica.
 - Não use slogans motivacionais.
 - Não copie trechos longos literalmente dos livros.
@@ -633,7 +666,7 @@ Regras de escrita:
 - Não use título.
 - Não use lista.
 - Não invente fatos concretos que o usuário não informou.
-- Entregue somente o texto final.
+- Entregue SOMENTE o texto final. Nada de comentários antes ou depois.
 
 Frases proibidas (bloqueio rigoroso):
 ${blockedPhrases}
