@@ -7,6 +7,14 @@ export type AuthorVoiceKind =
   | "ffp"
   | "voice-pattern";
 
+export type AuthorialDomain = 
+  | "amor_poesia"
+  | "fe_superacao"
+  | "reflexao_identidade"
+  | "direcao_ffp"
+  | "afeto_familia"
+  | "historia_vida";
+
 export interface AuthorVoiceSeed {
   id: string;
   kind: AuthorVoiceKind;
@@ -10390,7 +10398,22 @@ function scoreSeed(seed: AuthorVoiceSeed, query: Required<AuthorVoiceQuery>): nu
   for (const emotion of seed.emotions) {
     if (normalize(query.intention).includes(normalize(emotion))) score += 5;
   }
-  if (seed.recipients.some((item) => normalize(item) === normalize(query.recipient))) score += 10;
+  const recipientMatch = seed.recipients.some((item) => 
+    normalize(query.recipient).includes(normalize(item)) || 
+    normalize(item).includes(normalize(query.recipient))
+  );
+  
+  if (recipientMatch) {
+    score += 10;
+  } else if (query.recipient && seed.recipients.length > 0) {
+    // Penalização pesada se a seed tiver um destinatário específico que contradiz o pedido (ex: seed de "pai" quando o pedido é "amiga")
+    const hardMismatch = seed.recipients.some(item => 
+      ["pai", "mãe", "filho", "filha", "esposa", "marido", "namorado", "namorada"].includes(normalize(item))
+    );
+    if (hardMismatch) {
+      score -= 50;
+    }
+  }
   if (seed.kind === "ffp" && /fe|motivacional|reflexao/.test(normalize(query.tone))) score += 5;
   if (seed.kind === "recipient" && seed.recipients.length > 0) score += 2;
   return score;
@@ -10431,38 +10454,59 @@ export function buildAuthorVoiceContext(seeds: AuthorVoiceSeed[]): string {
 
 /**
  * Sementes de Ouro (Golden Seeds)
- * Trechos curados manualmente que representam a essência pura do Poeta Sonhador.
+ * Trechos curados manualmente que representam a essência pura, humana e direta do Poeta Sonhador.
  * Usados para calibrar a IA e fortalecer o fallback local com máxima fidelidade autoral.
  */
-export const GOLDEN_SEEDS = [
+const GOLDEN_SEEDS_RAW = [
   {
+    domain: "fe_superacao" as AuthorialDomain,
     theme: "FFP (Fé, Força, Paciência)",
-    reflection: "A fé não é a certeza de que tudo vai dar certo, mas a coragem de continuar caminhando mesmo quando o chão parece desaparecer. A força é o pequeno passo que você dá. A paciência é o amor com que você espera o fruto amadurecer, sem arrancá-lo verde.",
+    reflection: "A fé não é a certeza de que tudo vai dar certo agora, mas a coragem de continuar caminhando mesmo quando o chão parece desaparecer. A força é o pequeno passo que você dá hoje. A paciência é o amor com que você espera o fruto amadurecer, sem arrancá-lo verde.",
     impact: "FFP não é um slogan. É o ciclo invisível que sustenta quem decidiu não desistir de si mesmo.",
     vocabulary: ["fé", "força", "paciência", "passo", "amadurecer", "ciclo", "sustentar"]
   },
   {
-    theme: "Cicatrizes e Superação",
-    reflection: "Suas cicatrizes não são marcas de quebra. São costuras de ouro. Elas contam a história silenciosa de quem decidiu ficar e reconstruir a própria casa, tijolo por tijolo, mesmo depois do terremoto.",
-    impact: "A pele lembra, mas a alma aprendeu a dançar com as marcas.",
-    vocabulary: ["cicatrizes", "costuras", "ouro", "reconstruir", "terremoto", "pele", "alma"]
+    domain: "historia_vida" as AuthorialDomain,
+    theme: "Cicatrizes e Superação Real",
+    reflection: "Suas cicatrizes não são marcas de quebra. São a prova de que você decidiu ficar e reconstruir a própria casa, tijolo por tijolo, mesmo depois do terremoto.",
+    impact: "A pele lembra, mas a alma aprendeu a seguir em frente com as marcas.",
+    vocabulary: ["cicatrizes", "reconstruir", "terremoto", "pele", "alma", "seguir"]
   },
   {
-    theme: "Recomeços",
+    domain: "direcao_ffp" as AuthorialDomain,
+    theme: "Recomeços e Direção",
     reflection: "Recomeçar não é apagar o passado ou voltar ao zero. É pegar todas as lições que a dor te ensinou e usá-las como mapa para um novo caminho. Você não está começando do nada; está começando com a sabedoria de quem já sobreviveu ao fim.",
     impact: "O recomeço é a arte de usar as ruínas como alicerce.",
     vocabulary: ["recomeçar", "mapa", "sabedoria", "sobreviveu", "ruínas", "alicerce", "novo"]
   },
   {
+    domain: "amor_poesia" as AuthorialDomain,
     theme: "Amor e Presença",
-    reflection: "O amor verdadeiro não grita, não exige e não faz de conta que é perfeito. Ele chega no silêncio das manhãs, se acomoda no peito e transforma o ordinário em poesia. É presença que fica, mesmo quando as palavras faltam.",
+    reflection: "O amor verdadeiro não grita e não faz de conta que é perfeito. Ele chega no silêncio das manhãs, se acomoda no peito e transforma o ordinário em abrigo. É presença que fica, mesmo quando as palavras faltam.",
     impact: "Amar é reconhecer morada no coração de alguém e cuidar do silêncio entre uma palavra e outra.",
-    vocabulary: ["amor", "silêncio", "presença", "morada", "coração", "poesia", "cuidar"]
+    vocabulary: ["amor", "silêncio", "presença", "abrigo", "coração", "cuidar"]
   },
   {
+    domain: "historia_vida" as AuthorialDomain,
     theme: "Esperança e Tristeza",
     reflection: "A esperança não é otimismo cego que ignora a dor. É a teimosia serena de acreditar que o amanhã merece ser visto, mesmo que hoje o peito pese. A tristeza é permitida; ela é a chuva que rega a terra para que algo novo possa brotar.",
     impact: "Chorar não é fraqueza. É a alma lavando o rosto para enxergar a luz com mais clareza.",
-    vocabulary: ["esperança", "teimosia", "serena", "tristeza", "chuva", "brota", "luz"]
+    vocabulary: ["esperança", "teimosia", "serena", "tristeza", "chuva", "brotar", "luz"]
+  },
+  {
+    domain: "afeto_familia" as AuthorialDomain,
+    theme: "Gratidão e Legado",
+    reflection: "O amor da família é o primeiro silêncio que nos ensina a escutar o mundo. É raiz, é exemplo, é o porto seguro que nos permite navegar mesmo quando não sabemos para onde ir.",
+    impact: "Obrigado por ser meu porto seguro, mesmo quando eu nem sabia que estava à deriva.",
+    vocabulary: ["família", "raiz", "exemplo", "porto", "seguro", "navegar", "obrigado"]
+  },
+  {
+    domain: "reflexao_identidade" as AuthorialDomain,
+    theme: "Verdade e Máscara",
+    reflection: "A gente passa a vida inteira tentando parecer forte para o mundo, mas a verdade é que a alma só encontra paz quando permite ser verdadeira.",
+    impact: "Deus não ama a sua performance, Ele ama a sua essência. É no silêncio da sua verdade que a cura começa.",
+    vocabulary: ["máscara", "verdade", "essência", "paz", "silêncio", "cura", "performance"]
   }
 ] as const;
+
+export const GOLDEN_SEEDS: (typeof GOLDEN_SEEDS_RAW)[number][] = [...GOLDEN_SEEDS_RAW];

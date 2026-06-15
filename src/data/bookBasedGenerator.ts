@@ -410,10 +410,14 @@ function destinationFor(data: GenRequest): string {
 
 function selectAuthorSeeds(data: GenRequest): AuthorVoiceSeed[] {
   const rng = createRng(`${data.generationId || createGenerationId()}-seeds`);
+  
+  // Prioriza o campo relationship (novo) sobre recipient (legado) para filtrar seeds
+  const targetRecipient = (data.relationship || data.recipient).toLowerCase();
+  
   const ranked = findAuthorVoiceSeeds({
     intention: `${data.intention} ${inferCategory(data.intention, data.tone)}`,
     tone: data.tone,
-    recipient: data.recipient,
+    recipient: targetRecipient,
     limit: 24,
   });
 
@@ -469,7 +473,7 @@ function summarizeIntention(data: GenRequest): string {
   if (/obrigad|gratidao|grato|grata/.test(normalized)) return "essa gratidão";
   if (/fe|deus|oracao|bencao|esperanca/.test(normalized)) return "essa fé";
   if (/forca|coragem|luta|recomec/.test(normalized)) return "essa vontade de recomeçar";
-  return `isso que tento dizer: ${intention}`;
+  return `esse sentimento por você`;
 }
 
 function buildAddress(data: GenRequest): string {
@@ -525,19 +529,19 @@ function buildSeedSentence(
   const feeling = summarizeIntention(data);
   if (!seed) return pick(bridgeSentences, rng);
 
-  const theme = pick(seed.themes.length > 0 ? seed.themes : [inferCategory(data.intention, data.tone)], rng);
   const emotion = pick(seed.emotions.length > 0 ? seed.emotions : [data.tone], rng);
   const image = pickSeedImage(seed, rng);
   const reflection = stripFinalPunctuation(seed.reflection);
   const impact = stripFinalPunctuation(seed.impact);
   const styleLine = pick(styleSentences[style], rng);
 
+  // Usa termos seguros em vez de injetar o tema bruto da seed como sujeito da frase
   const variants = [
     `A imagem de ${image} me lembra que ${lowerFirst(reflection)}, e hoje isso ganha o tamanho de ${feeling}.`,
-    `Entre ${theme} e ${emotion}, eu escolho uma presença que cuida, permanece e valoriza cada momento ao seu lado.`,
+    `Entre o cuidado e a ${emotion}, eu escolho uma presença que valoriza cada momento ao seu lado.`,
     `Fica uma certeza serena: ${lowerFirst(impact)}, e é com essa delicadeza que quero honrar nosso laço.`,
-    `O cuidado que sinto é genuíno; por isso busco chegar até você com respeito, verdade e ternura.`,
-    `${sentenceCase(theme)} não é uma ideia distante; aparece como gesto, como cuidado e como apoio real no dia a dia.`,
+    `O que sinto é genuíno; por isso busco chegar até você com respeito, verdade e ternura.`,
+    `Nossa conexão não é uma ideia distante; aparece como gesto, como cuidado e como apoio real no dia a dia.`,
     styleLine,
   ];
 
@@ -545,11 +549,10 @@ function buildSeedSentence(
 }
 
 function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: () => number): string {
-  const theme = seed?.themes[0] || inferCategory(data.intention, data.tone);
   const shouldUseFfp = /fé|motivacional|reflexão|perdão/.test(data.tone) || /f[eé]|luta|cansa|recome/i.test(data.intention);
   const variants = [
     pick(closingSentences, rng),
-    `Que ${theme} seja um motivo real para você sentir cuidado e proteção no dia a dia.`,
+    `Que esse laço seja um motivo real para você sentir cuidado e proteção no dia a dia.`,
     shouldUseFfp
       ? "Fé, força e paciência: que esses pilares sustentem o que ainda precisa florescer em você."
       : "Que o amor continue mostrando, em silêncio, aquilo que nenhuma pressa consegue explicar.",
@@ -617,7 +620,20 @@ export async function generateBookBasedMessage(
     previousMessages: mergePreviousMessages(prepared),
   };
   const category = inferCategory(data.intention, data.tone);
+  
+  // LOGS TEMPORÁRIOS PARA DEPURAÇÃO DE RELACIONAMENTO
+  console.log("[DEBUG ALMA ESCRITA] Relação recebida (relationship):", data.relationship);
+  console.log("[DEBUG ALMA ESCRITA] Destinatário normalizado (recipient):", data.recipient);
+  console.log("[DEBUG ALMA ESCRITA] Alvo para filtro de seeds:", (data.relationship || data.recipient).toLowerCase());
+  
   const seeds = selectAuthorSeeds(data);
+  
+  console.log("[DEBUG ALMA ESCRITA] Seeds selecionadas (top 3):", seeds.slice(0, 3).map(s => ({
+    id: s.id,
+    themes: s.themes,
+    recipients: s.recipients
+  })));
+
   const authorContext = buildAuthorVoiceContext(seeds);
   const generationId = data.generationId || createGenerationId();
   const style = styleForGeneration(generationId);
@@ -641,14 +657,15 @@ HIERARQUIA ABSOLUTA DE CONTEÚDO:
 
 REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
 1. A IA NÃO EXISTE. Você é o Remetente falando diretamente com o Destinatário.
-2. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use variações de: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "verdade simples", "cuidado que existe aqui", "não escrevo para impressionar".
-3. A mensagem deve começar falando DA PESSOA, da relação, da ocasião ou da memória compartilhada. NUNCA comece falando sobre escrever, sobre o texto ou sobre a mensagem.
+2. RESPEITO ABSOLUTO AO RELACIONAMENTO: Se o relacionamento é "Amiga", NUNCA use palavras como "pai", "mãe", "filho", "esposa". Adapte totalmente o tom para amizade. Se for "Pai", use tom paternal. Se for "Esposa", use tom romântico.
+3. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use variações de: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "verdade simples", "cuidado que existe aqui", "não escrevo para impressionar".
+4. A mensagem deve começar falando DA PESSOA, da relação, da ocasião ou da memória compartilhada. NUNCA comece falando sobre escrever, sobre o texto ou sobre a mensagem.
    - ERRADO: "Alessandra, não escrevo para impressionar..."
    - CERTO: "Alessandra, uma das coisas que mais admiro em você é a forma como consegue trazer calma aos dias difíceis."
    - ERRADO: "Entrego esta mensagem como oração pequena..."
    - CERTO: "Quando penso nos momentos que vivemos, lembro da força e da bondade que você demonstra nas pequenas atitudes."
-4. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencioná-lo ou aludir a ele de forma concreta no corpo do texto.
-5. PRIORIZE FATOS CONCRETOS sobre abstrações.
+5. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencioná-lo ou aludir a ele de forma concreta no corpo do texto.
+6. PRIORIZE FATOS CONCRETOS sobre abstrações.
    - ERRADO: "o amor aparece como caminho possível"
    - CERTO: "você esteve ao meu lado quando eu mais precisei"
    - ERRADO: "amizade como gesto"
