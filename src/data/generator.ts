@@ -183,6 +183,10 @@ export function normalizeGenRequest(request: GenRequest): GenRequest {
       ? request.recipient
       : "mim",
     name: request.name.trim(),
+    senderName: request.senderName?.trim(),
+    relationship: request.relationship,
+    occasion: request.occasion,
+    sharedMemory: request.sharedMemory?.trim(),
     intention: request.intention.trim(),
     tone: GEN_TONES.includes(request.tone) ? request.tone : "emocionante",
     length: GEN_LENGTHS.includes(request.length) ? request.length : "média",
