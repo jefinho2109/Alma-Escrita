@@ -85,6 +85,17 @@ const BLOCKED_PHRASES = [
   "frase pronta",
   "poucas linhas",
   "resumir tudo",
+  "esta versão nasce",
+  "tom poético",
+  "diferente da anterior",
+  "por outro caminho",
+  "poesia quieta",
+  "cada palavra procura",
+  "alma, verdade e ternura",
+  "eu te escrevo",
+  "só palavra",
+  "três palavras",
+  "dizer presença",
 ] as const;
 
 const simpleTextCorrections: Array<[RegExp, string]> = [
@@ -154,7 +165,7 @@ type VariationStyle = (typeof variationStyles)[number];
 
 const styleSentences: Record<VariationStyle, string[]> = {
   romântico: [
-    "Quando penso nesse amor, percebo que amar também é cuidar dos silêncios entre uma palavra e outra.",
+    "Quando penso nesse amor, percebo que amar também é cuidar dos silêncios e dos pequenos gestos do dia a dia.",
     "Meu carinho aparece nos detalhes, como quem escolhe permanecer mesmo quando nada exige espetáculo.",
   ],
   profundo: [
@@ -162,20 +173,20 @@ const styleSentences: Record<VariationStyle, string[]> = {
     "O que sinto desce além da superfície e encontra um lugar onde a alma reconhece presença.",
   ],
   simples: [
-    "Eu só queria que você sentisse, sem exagero, que existe carinho real em cada palavra.",
+    "Eu só queria que você sentisse, sem exagero, que existe um carinho real e constante em tudo que fazemos.",
     "Às vezes o mais bonito é dizer o essencial com calma, sem enfeitar demais o coração.",
   ],
   poético: [
     "Esse sentimento chega como luz baixa na janela da alma, sem pressa, mas inteiro.",
-    "Há uma poesia quieta em tudo que é verdadeiro: ela toca sem empurrar e fica sem prender.",
+    "Há uma beleza quieta em tudo que é verdadeiro: ela toca sem empurrar e fica sem prender.",
   ],
   espiritual: [
-    "Que Deus cuide do que minhas palavras não alcançam e faça esse afeto chegar com paz.",
-    "Eu entrego esta mensagem como oração pequena, pedindo que ela encontre o lugar certo no seu coração.",
+    "Que Deus cuide do que o meu afeto não alcança e faça esse cuidado chegar com paz.",
+    "Deixo este carinho como um pedido sereno, para que ele encontre o lugar certo no seu coração.",
   ],
   motivacional: [
     "Mesmo nos dias difíceis, esse sentimento me lembra que ainda existe beleza em cuidar e continuar.",
-    "Que esta palavra levante algo bom dentro de você, como força serena para seguir com o coração mais leve.",
+    "Que este apoio levante algo bom dentro de você, como força serena para seguir com o coração mais leve.",
   ],
   "carta curta": [
     "Meu cuidado por você chega limpo, direto e verdadeiro, atravessando qualquer distância.",
@@ -474,10 +485,10 @@ function buildOpening(data: GenRequest, rng: () => number, style: VariationStyle
   const feeling = summarizeIntention(data);
   const variants = [
     `${address}, ${pick(fallbackOpenings.named, rng)}`,
-    `${address}, quando penso em ${feeling}, eu encontro uma forma mais bonita de dizer presença.`,
-    `${address}, não escrevo para impressionar; escrevo para que você sinta o cuidado que existe aqui.`,
-    `${address}, o que trago no peito pede uma palavra nova, dessas que abraçam sem fazer barulho.`,
-    `${address}, esta versão nasce em tom ${style}, diferente da anterior, para alcançar você por outro caminho.`,
+    `${address}, quando penso em ${feeling}, percebo o quanto sua presença faz toda a diferença.`,
+    `${address}, uma das coisas que mais admiro em você é a forma como traz calma aos dias difíceis.`,
+    `${address}, o que trago no peito é a certeza de que nosso laço é forte e verdadeiro.`,
+    `${address}, lembro com carinho dos momentos em que sua força me ajudou a seguir em frente.`,
   ];
   return pick(variants, rng);
 }
@@ -522,11 +533,11 @@ function buildSeedSentence(
   const styleLine = pick(styleSentences[style], rng);
 
   const variants = [
-    `A imagem de ${image} me lembra que ${lowerFirst(reflection)}, mas hoje isso ganha o tamanho de ${feeling}.`,
-    `Entre ${theme} e ${emotion}, eu escolho uma presença que cuida, permanece e não transforma sentimento em frase vazia.`,
-    `Fica uma certeza serena: ${lowerFirst(impact)}, e é com essa delicadeza que eu te escrevo.`,
-    `O tom que nasce aqui é de ${seed.tone}; por isso cada palavra procura chegar com alma, verdade e ternura.`,
-    `${sentenceCase(theme)} não aparece aqui como ideia distante; aparece como gesto, como cuidado e como caminho possível.`,
+    `A imagem de ${image} me lembra que ${lowerFirst(reflection)}, e hoje isso ganha o tamanho de ${feeling}.`,
+    `Entre ${theme} e ${emotion}, eu escolho uma presença que cuida, permanece e valoriza cada momento ao seu lado.`,
+    `Fica uma certeza serena: ${lowerFirst(impact)}, e é com essa delicadeza que quero honrar nosso laço.`,
+    `O cuidado que sinto é genuíno; por isso busco chegar até você com respeito, verdade e ternura.`,
+    `${sentenceCase(theme)} não é uma ideia distante; aparece como gesto, como cuidado e como apoio real no dia a dia.`,
     styleLine,
   ];
 
@@ -538,13 +549,13 @@ function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: 
   const shouldUseFfp = /fé|motivacional|reflexão|perdão/.test(data.tone) || /f[eé]|luta|cansa|recome/i.test(data.intention);
   const variants = [
     pick(closingSentences, rng),
-    `Que ${theme} não seja só palavra, mas uma forma de você sentir cuidado no lugar certo.`,
+    `Que ${theme} seja um motivo real para você sentir cuidado e proteção no dia a dia.`,
     shouldUseFfp
-      ? "Fé, força e paciência: que essas três palavras sustentem o que ainda precisa florescer."
-      : "Que o amor continue dizendo, em silêncio, aquilo que nenhuma pressa consegue explicar.",
+      ? "Fé, força e paciência: que esses pilares sustentem o que ainda precisa florescer em você."
+      : "Que o amor continue mostrando, em silêncio, aquilo que nenhuma pressa consegue explicar.",
     data.name
-      ? `${data.name}, que você receba isso como verdade simples, dessas que não precisam se repetir para permanecer.`
-      : "Que a alma receba esta mensagem como quem encontra descanso depois de um dia longo.",
+      ? `${data.name}, que você receba este carinho como algo genuíno, que não precisa se repetir para permanecer.`
+      : "Que o coração encontre descanso e renovação depois de um dia longo.",
   ];
 
   return pick(variants, rng);
