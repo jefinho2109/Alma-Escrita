@@ -527,28 +527,33 @@ function buildSeedSentence(
   style: VariationStyle,
   index: number,
 ): string {
-  const feeling = summarizeIntention(data);
   if (!seed) return pick(bridgeSentences, rng);
 
+  // REGRA DE OURO: Se existe memória compartilhada, ela DOMINA o fallback. 
+  // Templates abstratos são completamente ignorados para evitar "a imagem de hoje me lembra..."
+  if (data.sharedMemory) {
+    const memoryVariants = [
+      `Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`,
+      `Quando penso em ${data.sharedMemory}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
+      `Nunca vou esquecer de ${data.sharedMemory}. Foi ali que eu entendi o tamanho do seu cuidado.`,
+    ];
+    return pick(memoryVariants, rng);
+  }
+
   const emotion = pick(seed.emotions.length > 0 ? seed.emotions : [data.tone], rng);
-  const image = pickSeedImage(seed, rng);
   const reflection = stripFinalPunctuation(seed.reflection);
   const impact = stripFinalPunctuation(seed.impact);
   const styleLine = pick(styleSentences[style], rng);
 
+  // Templates seguros, sem a construção falha "A imagem de X me lembra..."
   const variants = [
-    `A imagem de ${image} me lembra que ${lowerFirst(reflection)}, e hoje isso ganha o tamanho de ${feeling}.`,
+    `Esse momento me lembra que ${lowerFirst(reflection)}, e isso ganha um significado especial entre nós.`,
     `Entre o cuidado e a ${emotion}, eu escolho uma presença que valoriza cada momento ao seu lado.`,
     `Fica uma certeza serena: ${lowerFirst(impact)}, e é com essa delicadeza que quero honrar nosso laço.`,
-    `O que sinto é genuíno; por isso busco chegar até você com respeito, verdade e ternura.`,
-    `Nossa conexão não é uma ideia distante; aparece como gesto, como cuidado e como apoio real no dia a dia.`,
+    `O que sinto é genuíno; por isso busco chegar até você com respeito e verdade.`,
+    `Nossa conexão não é uma ideia distante; aparece como gesto e como apoio real no dia a dia.`,
     styleLine,
   ];
-
-  // REGRA DE OURO: Se existe memória compartilhada, ela DEVE ser a variante prioritária no fallback
-  if (data.sharedMemory) {
-    variants.unshift(`Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`);
-  }
 
   return variants[index % variants.length];
 }
@@ -626,16 +631,7 @@ export async function generateBookBasedMessage(
   };
   const category = inferCategory(data.intention, data.tone);
   
-  // LOGS DE PIPELINE PARA DEPURAÇÃO DE ESPECIFICIDADE
-  console.log("[DEBUG PIPELINE] Relacionamento:", data.relationship || data.recipient);
-  console.log("[DEBUG PIPELINE] Ocasião:", data.occasion || data.intention);
-  console.log("[DEBUG PIPELINE] Memória recebida do formulário:", data.sharedMemory || "Nenhuma");
-  
   const seeds = selectAuthorSeeds(data);
-  
-  console.log("[DEBUG PIPELINE] Seeds selecionadas (top 3 IDs):", seeds.slice(0, 3).map(s => s.id));
-  console.log("[DEBUG PIPELINE] Memória enviada ao prompt:", data.sharedMemory ? `"${data.sharedMemory}"` : "Foco na essência");
-
   const authorContext = buildAuthorVoiceContext(seeds);
   const generationId = data.generationId || createGenerationId();
   const style = styleForGeneration(generationId);
@@ -666,12 +662,10 @@ REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
    - CERTO: "Alessandra, uma das coisas que mais admiro em você é a forma como consegue trazer calma aos dias difíceis."
    - ERRADO: "Entrego esta mensagem como oração pequena..."
    - CERTO: "Quando penso nos momentos que vivemos, lembro da força e da bondade que você demonstra nas pequenas atitudes."
- 5. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencionar elementos concretos dela (locais, ações, situações, objetos) no corpo do texto.
- 6. SCORE DE ESPECIFICIDADE: Se houver memória, é PROIBIDO usar apenas palavras abstratas como "presença", "carinho", "afeto", "ternura", "cuidado" ou "sentimento" sem conectá-las a um fato concreto da memória.
-    - ERRADO (Genérico): "Alessandra, lembro com carinho dos momentos em que sua força me ajudou." (Serve para qualquer um)
-    - CERTO (Específico): "Alessandra, lembro-me concretamente de quando você me visitava todos os dias no hospital. Naquele período difícil, sua presença foi meu porto seguro."
-    - ERRADO: "amizade como gesto"
-    - CERTO: "você me ouviu quando ninguém mais ouviu"
+ 5. REGRA DOS 40% DE MEMÓRIA: Se o campo "Memória compartilhada" foi fornecido, PELO MENOS 40% do texto gerado deve derivar diretamente de fatos, locais, ações ou situações mencionados nessa memória. A narrativa deve ser pessoal, não uma reflexão filosófica.
+    - ERRADO (Abstrato/Genérico): "A imagem de hoje me lembra que gratidão é a memória da alma." (A memória foi ignorada, frase sem sentido).
+    - CERTO (Narrativa Pessoal): "Jany, lembro da conversa que tivemos naquele dia no hospital. Quando você me visitava, eu percebia o tamanho do seu coração."
+ 6. SCORE DE ESPECIFICIDADE: É PROIBIDO usar apenas palavras abstratas como "presença", "carinho", "afeto", "ternura", "cuidado" ou "sentimento" sem conectá-las a um fato concreto da memória fornecida.
 
 Gere UMA resposta direta, profunda, emocional e pronta para compartilhar.
 
@@ -716,6 +710,13 @@ Regras de escrita:
 Frases proibidas (bloqueio rigoroso):
 ${blockedPhrases}
 `.trim();
+
+  // LOGS OBRIGATÓRIOS DE PIPELINE
+  console.log("[DEBUG PIPELINE] seed vencedora:", seeds[0]?.id || "Nenhuma");
+  console.log("[DEBUG PIPELINE] texto da seed:", seeds[0]?.reflection || "Nenhum");
+  console.log("[DEBUG PIPELINE] trechos autorais selecionados:", seeds.slice(0, 3).map(s => s.reflection));
+  console.log("[DEBUG PIPELINE] memória recebida:", data.sharedMemory || "Nenhuma");
+  console.log("[DEBUG PIPELINE] prompt final (resumido):", prompt.substring(0, 600) + "...");
 
   try {
     const aiText = cleanGeneratedText(await generateAIMsg(prompt));
