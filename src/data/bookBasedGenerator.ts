@@ -529,23 +529,68 @@ function pickSeedImage(seed: AuthorVoiceSeed, rng: () => number): string {
 
 function classifySharedMemory(text: string): "memory" | "advice" | "declaration" | "other" {
   const lower = text.toLowerCase();
+  const wordCount = text.split(/\s+/).length;
   
-  // Indicadores de conselho/motivação (imperativos, incentivos)
+  // 1. Conselhos/Motivação curtos ou diretos
   if (/não desista|acredite|continue|força|lute|supere|não desanime|siga em frente|confie|nunca desista/i.test(lower)) {
     return "advice";
   }
   
-  // Indicadores de declaração afetiva direta
-  if (/você é|amo|sou grato|me faz feliz|motivo do meu|te amo/i.test(lower)) {
+  // 2. Declarações afetivas diretas e curtas
+  if (wordCount < 6 && /\bamo\b|\bte amo\b|sou grato|me faz feliz|motivo do meu|obrigado/i.test(lower)) {
     return "declaration";
   }
   
-  // Indicadores de memória concreta (passado, eventos específicos)
+  // 3. Memórias concretas (passado, eventos específicos)
   if (/quando|lembr|aquele dia|vez que|no dia|quando você/i.test(lower)) {
     return "memory";
   }
   
+  // 4. Outros (frases completas, orações complexas, mensagens centrais elaboradas)
   return "other";
+}
+
+function adaptDetailToNaturalNarrative(detail: string, context: 'memory' | 'apology' | 'advice' | 'declaration' | 'general' | 'other'): string {
+  const trimmed = detail.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 1. Pedido de desculpas + oração de dúvida/rejeição
+  if (context === 'apology' && /você pode pensar que não te amo/i.test(lower)) {
+    return "qualquer atitude minha que tenha feito você pensar que eu não te amo";
+  }
+  if (context === 'apology' && /(você pode pensar|acha que|duvida)/i.test(lower)) {
+    return `qualquer situação que tenha feito você pensar: "${trimmed}"`;
+  }
+
+  // 2. Declaração/Gratidão iniciando com "obrigado" ou "agradeço"
+  if (/^obrigado|^agradeço/i.test(trimmed)) {
+    const cleaned = trimmed.replace(/^obrigado\s+(por\s+)?/i, "").replace(/^agradeço\s+(por\s+)?/i, "").replace(/^estar\s+/i, "").trim();
+    return `ter ${cleaned}`; 
+  }
+
+  // 3. Declaração direta ("você é...", "te amo")
+  if (/^você é|^te amo|^amo muito/i.test(trimmed)) {
+    return `que ${trimmed}`;
+  }
+
+  // 4. Conselho imperativo curto
+  if (/não desista/i.test(lower)) {
+    return "de não desistir";
+  }
+  if (/acredite em você/i.test(lower)) {
+    return "de acreditar em si mesma";
+  }
+  if (/continue|força|lute|supere|não desanime|siga em frente|confie|nunca desista/i.test(lower)) {
+    return `de que "${trimmed}"`;
+  }
+
+  // 5. Memória concreta (mantém fluido)
+  if (context === 'memory' && /^(quando|lembro|aquele dia|vez que)/i.test(lower)) {
+    return trimmed; 
+  }
+
+  // 6. Fallback seguro: isola com aspas
+  return `"${trimmed}"`;
 }
 
 function buildSeedSentence(
@@ -557,43 +602,43 @@ function buildSeedSentence(
 ): string {
   if (!seed) return pick(bridgeSentences, rng);
 
-  // REGRA DE OURO: Classificar o tipo de detalhe informado para evitar inserção literal em templates inadequados.
+  // REGRA DE OURO: Adaptar sintaticamente o detalhe para evitar quebra gramatical e fundi-lo à narrativa.
   if (data.sharedMemory) {
     const memoryType = classifySharedMemory(data.sharedMemory);
+    const adapted = adaptDetailToNaturalNarrative(data.sharedMemory, memoryType);
     
     if (memoryType === "advice") {
       const adviceVariants = [
-        `Quero lembrar você de que ${data.sharedMemory}.`,
-        `Leve sempre comigo este pensamento: ${data.sharedMemory}.`,
-        `Espero que você nunca esqueça: ${data.sharedMemory}.`,
-        `Que estas palavras sirvam para reforçar: ${data.sharedMemory}.`,
+        `Quero lembrar você ${adapted}.`,
+        `Levo sempre comigo ${adapted}.`,
+        `Espero que você nunca esqueça ${adapted}.`,
       ];
       return pick(adviceVariants, rng);
     }
     
     if (memoryType === "declaration") {
       const declarationVariants = [
-        `Tem uma verdade simples que carrego comigo: ${data.sharedMemory}.`,
-        `Sempre levo no peito a certeza de que ${data.sharedMemory}.`,
-        `Guardo como um tesouro o fato de que ${data.sharedMemory}.`,
+        `Sou grato por ${adapted}.`,
+        `Quero que esta mensagem seja um eco do que sinto: ${adapted}.`,
+        `Deixo aqui registrado o que meu coração diz: ${adapted}.`,
       ];
       return pick(declarationVariants, rng);
     }
     
     if (memoryType === "memory") {
       const factVariants = [
-        `Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`,
-        `Quando penso em ${data.sharedMemory}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
-        `Nunca vou esquecer de ${data.sharedMemory}. Foi ali que eu entendi o tamanho do seu cuidado.`,
+        `Lembro-me concretamente de ${adapted}, e é por isso que nosso laço é tão valioso.`,
+        `Quando penso em ${adapted}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
+        `Nunca vou esquecer de ${adapted}. Foi ali que eu entendi o tamanho do seu cuidado.`,
       ];
       return pick(factVariants, rng);
     }
 
-    // Fallback para "other" (tratamento genérico mas seguro, sem assumir que é um fato concreto)
+    // Fallback para "other"
     const otherVariants = [
-      `Levo sempre comigo que ${data.sharedMemory}.`,
-      `Quero que saiba que ${data.sharedMemory}.`,
-      `Este pensamento guia o que sinto: ${data.sharedMemory}.`,
+      `Quero que esta mensagem leve até você este sentimento: "${data.sharedMemory.trim()}".`,
+      `Deixo esta verdade registrada no meu coração: "${data.sharedMemory.trim()}".`,
+      `Este pensamento guia o que sinto por você: "${data.sharedMemory.trim()}".`,
     ];
     return pick(otherVariants, rng);
   }
@@ -686,7 +731,8 @@ function buildApologyFallback(data: GenRequest): string {
   let sentences = [sentence1, sentence2];
   
   if (data.sharedMemory) {
-    sentences.push(`Sei que minhas ações afetaram ${data.sharedMemory}, e peço desculpas de coração por ter ferido nossa confiança.`);
+    const adapted = adaptDetailToNaturalNarrative(data.sharedMemory, 'apology');
+    sentences.push(`Peço perdão de coração por ${adapted}, e espero que possamos reconstruir nossa confiança.`);
   } else {
     sentences.push(`Peço desculpas de coração e espero que, com o tempo, possamos reconstruir o que foi abalado.`);
   }
@@ -716,12 +762,16 @@ export async function generateBookBasedMessage(
     (phrase) => `- "${phrase}"`,
   ).join("\n");
 
-  // LOGS DE AUDITORIA AUTORAL (EXATAMENTE COMO SOLICITADO)
-  console.log("[DEBUG AUTORAL] Seeds escolhidas:", seeds.slice(0, 3).map(s => s.id).join(", "));
-  console.log("[DEBUG AUTORAL] Temas:", seeds.slice(0, 3).map(s => s.themes.join(", ")).join(" | "));
-  console.log("[DEBUG AUTORAL] Reflexões (OCULTAS DO PROMPT, mas presentes nas seeds):", seeds.slice(0, 3).map(s => s.reflection).join(" | "));
-  console.log("[DEBUG AUTORAL] Trechos enviados ao prompt (apenas ingredientes, SEM reflexões):", authorContext.substring(0, 400) + "...");
-  console.log("[DEBUG AUTORAL] Memória/Detalhes do usuário:", data.sharedMemory || "Nenhum");
+  // LOGS DE AUDITORIA AUTORAL
+  console.log("[AUTHOR_BASE]");
+  console.log("query:", { intention: data.intention, tone: data.tone, recipient: data.relationship });
+  console.log("livros encontrados:", [...new Set(seeds.map(s => s.sourceBook))].join(", "));
+  console.log("trechos selecionados:", seeds.slice(0, 2).map(s => s.impact).join(" | "));
+  console.log("temas selecionados:", seeds.slice(0, 2).map(s => s.themes.join(", ")).join(" | "));
+  console.log("motivo da seleção:", "Score de relevância por intenção, tom e relacionamento");
+  
+  console.log("[FINAL_PROMPT]");
+  console.log("resumo:", `Dados: ${data.name} (${data.relationship}), Ocasião: ${data.occasion}. Base autoral: ${seeds.length} seeds de ${[...new Set(seeds.map(s => s.sourceBook))].join(", ")}.`);
 
   const prompt = `
 Você é a voz autoral do app Alma Escrita Oficial, encarnando a identidade do Poeta Sonhador.
@@ -736,7 +786,7 @@ REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
 1. A IA NÃO EXISTE. Você é o Remetente falando diretamente com o Destinatário.
 2. DOMÍNIO ABSOLUTO DA OCASIÃO: Se a Ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade. É ESTRITAMENTE PROIBIDO transformar um pedido de desculpas em declaração de amor romântico, homenagem ou mensagem genérica de carinho.
    - Exemplo para Pedido de Desculpas (Pai para Filho): "Jordan, quero reconhecer que errei e peço perdão por isso. Como pai, assumo minha responsabilidade e prometo fazer diferente, porque nosso laço é o que mais importa para mim."
-3. PROIBIDO COPIAR REFLEXÕES: O contexto autoral abaixo fornece APENAS ingredientes (temas, vocabulário, tom). É ESTRITAMENTE PROIBIDO copiar, parafrasear ou usar as frases de reflexão/impacto completas dos livros. Construa as frases do zero usando os dados do usuário.
+3. USO OBRIGATÓRIO DA ESSÊNCIA AUTORAL: use as frases de 'reflection' e 'impact' do contexto abaixo como inspiração forte. Entrelace e adapte essas ideias ao nome, relação, ocasião e detalhe do usuário. Não cole como citação isolada; funda-as naturalmente na narrativa da mensagem.
 4. RESPEITO ABSOLUTO AO RELACIONAMENTO: Adapte totalmente o tom à relação informada.
 5. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "cuidado que existe aqui", "não escrevo para impressionar".
 6. REGRA DA ÂNCORA: Se o campo "Memória/Detalhes" contiver uma declaração emocional (ex: "você é o motivo do meu melhor sorriso"), use essa frase EXATAMENTE ou adaptada naturalmente como o centro da mensagem. NÃO invente fatos, locais ou acontecimentos que o usuário não informou.
