@@ -96,6 +96,13 @@ const BLOCKED_PHRASES = [
   "só palavra",
   "três palavras",
   "dizer presença",
+  "quando penso em esse amor",
+  "em esse amor",
+  "presença faz toda diferença",
+  "esse momento me lembra",
+  "amar é escrever cuidado",
+  "escolho te entregar presença",
+  "não precisa se repetir para permanecer",
 ] as const;
 
 const simpleTextCorrections: Array<[RegExp, string]> = [
@@ -520,6 +527,14 @@ function pickSeedImage(seed: AuthorVoiceSeed, rng: () => number): string {
   );
 }
 
+function isEmotionalAnchor(text: string): boolean {
+  const normalized = text.toLowerCase();
+  // Se for curto e contiver declarações diretas, é uma âncora emocional, não um relato de fato.
+  const isShort = text.split(/\s+/).length < 15;
+  const hasDeclaration = /você é|amo|sou grato|me faz feliz|motivo do meu|te amo/i.test(normalized);
+  return isShort && hasDeclaration;
+}
+
 function buildSeedSentence(
   seed: AuthorVoiceSeed | undefined,
   data: GenRequest,
@@ -529,30 +544,33 @@ function buildSeedSentence(
 ): string {
   if (!seed) return pick(bridgeSentences, rng);
 
-  // REGRA DE OURO: Se existe memória compartilhada, ela DOMINA o fallback. 
-  // Templates abstratos são completamente ignorados para evitar "a imagem de hoje me lembra..."
+  // REGRA DE OURO: Tratar detalhes emocionais como âncora, sem inventar fatos.
   if (data.sharedMemory) {
-    const memoryVariants = [
-      `Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`,
-      `Quando penso em ${data.sharedMemory}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
-      `Nunca vou esquecer de ${data.sharedMemory}. Foi ali que eu entendi o tamanho do seu cuidado.`,
-    ];
-    return pick(memoryVariants, rng);
+    if (isEmotionalAnchor(data.sharedMemory)) {
+      const anchorVariants = [
+        `Tem uma verdade simples que carrego comigo: ${data.sharedMemory}.`,
+        `Sempre levo no peito a certeza de que ${data.sharedMemory}.`,
+        `Guardo como um tesouro o fato de que ${data.sharedMemory}.`,
+      ];
+      return pick(anchorVariants, rng);
+    } else {
+      const factVariants = [
+        `Lembro-me concretamente de ${data.sharedMemory}, e é por isso que nosso laço é tão valioso.`,
+        `Quando penso em ${data.sharedMemory}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
+        `Nunca vou esquecer de ${data.sharedMemory}. Foi ali que eu entendi o tamanho do seu cuidado.`,
+      ];
+      return pick(factVariants, rng);
+    }
   }
 
-  const emotion = pick(seed.emotions.length > 0 ? seed.emotions : [data.tone], rng);
-  const reflection = stripFinalPunctuation(seed.reflection);
-  const impact = stripFinalPunctuation(seed.impact);
-  const styleLine = pick(styleSentences[style], rng);
-
-  // Templates seguros, sem a construção falha "A imagem de X me lembra..."
+  // CORREÇÃO DEFINITIVA: Removido o uso de seed.impact e seed.reflection para evitar injeção de frases prontas dos livros.
+  // O fallback agora usa apenas estruturas neutras que forçam o foco na relação e no destinatário, sem conclusões poéticas prontas.
   const variants = [
-    `Esse momento me lembra que ${lowerFirst(reflection)}, e isso ganha um significado especial entre nós.`,
-    `Entre o cuidado e a ${emotion}, eu escolho uma presença que valoriza cada momento ao seu lado.`,
-    `Fica uma certeza serena: ${lowerFirst(impact)}, e é com essa delicadeza que quero honrar nosso laço.`,
-    `O que sinto é genuíno; por isso busco chegar até você com respeito e verdade.`,
-    `Nossa conexão não é uma ideia distante; aparece como gesto e como apoio real no dia a dia.`,
-    styleLine,
+    `Esse momento me faz valorizar ainda mais o que temos, e isso ganha um significado especial entre nós.`,
+    `Entre o cuidado e o que sentimos, eu escolho valorizar cada instante ao seu lado.`,
+    `Fica uma certeza serena: é com essa delicadeza que quero honrar nosso laço e reafirmar o que sinto por você.`,
+    `O que sinto é genuíno; por isso busco chegar até você com respeito e verdade todos os dias.`,
+    `Nossa conexão se mostra no dia a dia, através de gestos simples e de um apoio real que não precisa de grandes discursos.`,
   ];
 
   return variants[index % variants.length];
@@ -560,15 +578,18 @@ function buildSeedSentence(
 
 function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: () => number): string {
   const shouldUseFfp = /fé|motivacional|reflexão|perdão/.test(data.tone) || /f[eé]|luta|cansa|recome/i.test(data.intention);
+  
+  // CORREÇÃO DEFINITIVA: Removidas conclusões poéticas prontas ("amor mostrando em silêncio").
+  // O fechamento agora é estrutural e focado no vínculo com o destinatário.
   const variants = [
     pick(closingSentences, rng),
     `Que esse laço seja um motivo real para você sentir cuidado e proteção no dia a dia.`,
     shouldUseFfp
-      ? "Fé, força e paciência: que esses pilares sustentem o que ainda precisa florescer em você."
-      : "Que o amor continue mostrando, em silêncio, aquilo que nenhuma pressa consegue explicar.",
+      ? "Que a fé, a força e a paciência continuem sustentando o que construímos juntos."
+      : `Que você sinta, em cada detalhe do seu dia, o tamanho do que sinto por você, ${data.name || "meu bem"}.`,
     data.name
-      ? `${data.name}, que você receba este carinho como algo genuíno, que não precisa se repetir para permanecer.`
-      : "Que o coração encontre descanso e renovação depois de um dia longo.",
+      ? `${data.name}, que você receba este carinho como algo genuíno, que se renova a cada dia ao seu lado.`
+      : "Que o coração encontre descanso e renovação, sabendo que há alguém torcendo por você.",
   ];
 
   return pick(variants, rng);
@@ -642,32 +663,29 @@ export async function generateBookBasedMessage(
     (phrase) => `- "${phrase}"`,
   ).join("\n");
 
+  // LOGS DE AUDITORIA AUTORAL (EXATAMENTE COMO SOLICITADO)
+  console.log("[DEBUG AUTORAL] Seeds escolhidas:", seeds.slice(0, 3).map(s => s.id).join(", "));
+  console.log("[DEBUG AUTORAL] Temas:", seeds.slice(0, 3).map(s => s.themes.join(", ")).join(" | "));
+  console.log("[DEBUG AUTORAL] Reflexões (OCULTAS DO PROMPT, mas presentes nas seeds):", seeds.slice(0, 3).map(s => s.reflection).join(" | "));
+  console.log("[DEBUG AUTORAL] Trechos enviados ao prompt (apenas ingredientes, SEM reflexões):", authorContext.substring(0, 400) + "...");
+  console.log("[DEBUG AUTORAL] Memória/Detalhes do usuário:", data.sharedMemory || "Nenhum");
+
   const prompt = `
 Você é a voz autoral do app Alma Escrita Oficial, encarnando a identidade do Poeta Sonhador.
 
-HIERARQUIA ABSOLUTA DE CONTEÚDO:
-1. Remetente: ${data.senderName || "Alguém que te quer bem"}
-2. Destinatário: ${data.name || data.recipient}
-3. Relacionamento: ${data.relationship || data.recipient}
-4. Ocasião: ${data.occasion || data.intention}
-5. Memória compartilhada: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
-6. Voz Poeta Sonhador: APENAS o estilo (ritmo, metáforas concretas), NUNCA o assunto.
+HIERARQUIA ABSOLUTA DE CONTEÚDO (REGRA 80/20):
+- 80% do texto deve ser construído INTEIRAMENTE a partir dos dados do usuário (nome, relação, ocasião, memória/detalhes).
+- 20% do texto pode usar o vocabulário e o ritmo da voz autoral abaixo como "tempero" estilístico.
 
 REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
 1. A IA NÃO EXISTE. Você é o Remetente falando diretamente com o Destinatário.
-2. RESPEITO ABSOLUTO AO RELACIONAMENTO: Se o relacionamento é "Amiga", NUNCA use palavras como "pai", "mãe", "filho", "esposa". Adapte totalmente o tom para amizade. Se for "Pai", use tom paternal. Se for "Esposa", use tom romântico.
-3. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use variações de: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "verdade simples", "cuidado que existe aqui", "não escrevo para impressionar".
-4. A mensagem deve começar falando DA PESSOA, da relação, da ocasião ou da memória compartilhada. NUNCA comece falando sobre escrever, sobre o texto ou sobre a mensagem.
-   - ERRADO: "Alessandra, não escrevo para impressionar..."
-   - CERTO: "Alessandra, uma das coisas que mais admiro em você é a forma como consegue trazer calma aos dias difíceis."
-   - ERRADO: "Entrego esta mensagem como oração pequena..."
-   - CERTO: "Quando penso nos momentos que vivemos, lembro da força e da bondade que você demonstra nas pequenas atitudes."
- 5. REGRA DOS 40% DE MEMÓRIA: Se o campo "Memória compartilhada" foi fornecido, PELO MENOS 40% do texto gerado deve derivar diretamente de fatos, locais, ações ou situações mencionados nessa memória. A narrativa deve ser pessoal, não uma reflexão filosófica.
-    - ERRADO (Abstrato/Genérico): "A imagem de hoje me lembra que gratidão é a memória da alma." (A memória foi ignorada, frase sem sentido).
-    - CERTO (Narrativa Pessoal): "Jany, lembro da conversa que tivemos naquele dia no hospital. Quando você me visitava, eu percebia o tamanho do seu coração."
- 6. SCORE DE ESPECIFICIDADE: É PROIBIDO usar apenas palavras abstratas como "presença", "carinho", "afeto", "ternura", "cuidado" ou "sentimento" sem conectá-las a um fato concreto da memória fornecida.
-
-Gere UMA resposta direta, profunda, emocional e pronta para compartilhar.
+2. PROIBIDO COPIAR REFLEXÕES: O contexto autoral abaixo fornece APENAS ingredientes (temas, vocabulário, tom). É ESTRITAMENTE PROIBIDO copiar, parafrasear ou usar as frases de reflexão/impacto completas dos livros. Construa as frases do zero usando os dados do usuário.
+3. RESPEITO ABSOLUTO AO RELACIONAMENTO: Adapte totalmente o tom à relação informada (ex: Esposa = romântico; Amiga = leal e presente).
+4. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "cuidado que existe aqui", "não escrevo para impressionar".
+5. REGRA DA ÂNCORA: Se o campo "Memória/Detalhes" contiver uma declaração emocional (ex: "você é o motivo do meu melhor sorriso"), use essa frase EXATAMENTE ou adaptada naturalmente como o centro da mensagem. NÃO invente fatos, locais ou acontecimentos que o usuário não informou.
+   - ERRADO (Inventando fatos): "Lembro daquele dia no hospital..." (se o usuário só disse "você me faz feliz").
+   - CERTO (Usando a âncora): "Tem uma verdade simples que carrego comigo: você é o motivo do meu melhor sorriso. Em muitos dias, basta lembrar do seu jeito para meu coração encontrar paz."
+6. Se o campo contiver um relato de fato concreto, use os detalhes desse fato como centro da narrativa.
 
 Dados do pedido:
 - Quem envia: ${data.senderName || "Alguém que te quer bem"}
@@ -677,18 +695,15 @@ Dados do pedido:
 - Memória ou detalhe especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
 - Tom escolhido: ${data.tone}
 - Tamanho escolhido: ${data.length} (${lengthGuidance[data.length]})
-- Categoria emocional inferida: ${category}
-- ID único desta geração: ${generationId}
 
-Base autoral ampliada extraída dos livros e poemas do projeto:
-- Total de sinais autorais disponíveis no app: ${AUTHOR_VOICE_STATS.totalSeeds}
-- Use os sinais abaixo APENAS como identidade literária (ritmo, metáforas concretas), NUNCA como texto para copiar.
+Base autoral (APENAS INGREDIENTES DE ESTILO):
+- Use APENAS o vocabulário, os temas e o padrão narrativo abaixo como inspiração de ritmo e tom.
+- NÃO use frases de reflexão ou impacto completas.
 
 ${authorContext}
 
 Método autoral obrigatório:
-- Comece DIRETAMENTE tratando a pessoa pelo nome ou pelo vínculo, citando uma qualidade, um momento ou a memória compartilhada.
-- Se houver uma memória especial, faça dela o coração da mensagem. Use os detalhes fornecidos de forma orgânica e concreta.
+- Comece DIRETAMENTE tratando a pessoa pelo nome ou pelo vínculo, integrando a memória/detalhe fornecido.
 - Incorpore o FFP (Fé, Força, Paciência) como a espinha dorsal invisível da mensagem, não como um slogan.
 - Termine com uma frase marcante, madura e humana, reafirmando o vínculo.
 
@@ -699,24 +714,15 @@ Regras de escrita:
 - Escreva em português do Brasil.
 - Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você).
 - Não use tom de autoajuda genérica.
-- Não use slogans motivacionais.
 - Não copie trechos longos literalmente dos livros.
 - Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
 - Não use título.
 - Não use lista.
-- Não invente fatos concretos que o usuário não informou.
 - Entregue SOMENTE o texto final. Nada de comentários antes ou depois.
 
 Frases proibidas (bloqueio rigoroso):
 ${blockedPhrases}
 `.trim();
-
-  // LOGS OBRIGATÓRIOS DE PIPELINE
-  console.log("[DEBUG PIPELINE] seed vencedora:", seeds[0]?.id || "Nenhuma");
-  console.log("[DEBUG PIPELINE] texto da seed:", seeds[0]?.reflection || "Nenhum");
-  console.log("[DEBUG PIPELINE] trechos autorais selecionados:", seeds.slice(0, 3).map(s => s.reflection));
-  console.log("[DEBUG PIPELINE] memória recebida:", data.sharedMemory || "Nenhuma");
-  console.log("[DEBUG PIPELINE] prompt final (resumido):", prompt.substring(0, 600) + "...");
 
   try {
     const aiText = cleanGeneratedText(await generateAIMsg(prompt));
