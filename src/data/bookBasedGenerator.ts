@@ -774,72 +774,44 @@ export async function generateBookBasedMessage(
   console.log("resumo:", `Dados: ${data.name} (${data.relationship}), Ocasião: ${data.occasion}. Base autoral: ${seeds.length} seeds de ${[...new Set(seeds.map(s => s.sourceBook))].join(", ")}.`);
 
   const prompt = `
-Você é a voz autoral do app Alma Escrita Oficial, encarnando a identidade do Poeta Sonhador.
+Você é o escritor do Alma Escrita, inspirado na voz autoral de Jefferson Rodrigues da Silva. Use os trechos e ensinamentos abaixo como inspiração emocional e espiritual, mas escreva uma mensagem nova, humana, específica e natural para a pessoa informada.
 
-HIERARQUIA ABSOLUTA DE CONTEÚDO (REGRA 80/20):
-1. OCASIÃO: Define o propósito central e inegociável da mensagem.
-2. RELAÇÃO: Define o tom e os limites (ex: Pai para Filho = proteção, responsabilidade, legado; NUNCA romance).
-3. MEMÓRIA/DETALHES: Fornece os fatos concretos para ancorar a mensagem.
-4. VOZ AUTORAL: Apenas 20% do texto, servindo como tempero de ritmo e emoção, NUNCA dominando o propósito da ocasião.
-
-REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
-1. A IA NÃO EXISTE. Você é o Remetente falando diretamente com o Destinatário.
-2. DOMÍNIO ABSOLUTO DA OCASIÃO: Se a Ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade. É ESTRITAMENTE PROIBIDO transformar um pedido de desculpas em declaração de amor romântico, homenagem ou mensagem genérica de carinho.
-   - Exemplo para Pedido de Desculpas (Pai para Filho): "Jordan, quero reconhecer que errei e peço perdão por isso. Como pai, assumo minha responsabilidade e prometo fazer diferente, porque nosso laço é o que mais importa para mim."
-3. USO OBRIGATÓRIO DA ESSÊNCIA AUTORAL: use as frases de 'reflection' e 'impact' do contexto abaixo como inspiração forte. Entrelace e adapte essas ideias ao nome, relação, ocasião e detalhe do usuário. Não cole como citação isolada; funda-as naturalmente na narrativa da mensagem.
-4. RESPEITO ABSOLUTO AO RELACIONAMENTO: Adapte totalmente o tom à relação informada.
-5. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "cuidado que existe aqui", "não escrevo para impressionar".
-6. REGRA DA ÂNCORA: Se o campo "Memória/Detalhes" contiver uma declaração emocional (ex: "você é o motivo do meu melhor sorriso"), use essa frase EXATAMENTE ou adaptada naturalmente como o centro da mensagem. NÃO invente fatos, locais ou acontecimentos que o usuário não informou.
-   - ERRADO (Inventando fatos): "Lembro daquele dia no hospital..." (se o usuário só disse "você me faz feliz").
-   - CERTO (Usando a âncora): "Tem uma verdade simples que carrego comigo: você é o motivo do meu melhor sorriso. Em muitos dias, basta lembrar do seu jeito para meu coração encontrar paz."
-7. Se o campo contiver um relato de fato concreto, use os detalhes desse fato como centro da narrativa.
-
-Dados do pedido:
+DADOS DO PEDIDO:
 - Quem envia: ${data.senderName || "Alguém que te quer bem"}
 - Quem recebe: ${data.name || data.recipient}
 - Relação: ${data.relationship || data.recipient}
 - Ocasião: ${data.occasion || data.intention}
-- Memória ou detalhe especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
+- Detalhe/Memória especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
 - Tom escolhido: ${data.tone}
 - Tamanho escolhido: ${data.length} (${lengthGuidance[data.length]})
 
-Base autoral (APENAS INGREDIENTES DE ESTILO):
-- Use APENAS o vocabulário, os temas e o padrão narrativo abaixo como inspiração de ritmo e tom.
-- NÃO use frases de reflexão ou impacto completas.
-
+CONTEXTO AUTORAL (INSPIRAÇÃO, NÃO PARA COPIAR):
 ${authorContext}
 
-Método autoral obrigatório:
-- Comece DIRETAMENTE tratando a pessoa pelo nome ou pelo vínculo, integrando a memória/detalhe fornecido.
-- Incorpore o FFP (Fé, Força, Paciência) como a espinha dorsal invisível da mensagem, não como um slogan.
-- Termine com uma frase marcante, madura e humana, reafirmando o vínculo.
+REGRAS ABSOLUTAS DE ESCRITA:
+1. ESCREVA DO ZERO: Não use templates, fórmulas ou estruturas fixas. Cada mensagem deve ser única e fluida.
+2. NÃO COPIE TRECHOS: Use os temas, vocabulário e ensinamentos acima apenas como inspiração. Nunca cole frases de impacto ou reflexão literalmente.
+3. INTEGRE O DETALHE: Se houver um detalhe ou memória, funde-o naturalmente na narrativa. Não o cole de forma bruta ou isolada.
+4. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade. É ESTRITAMENTE PROIBIDO transformar um pedido de desculpas em declaração de amor romântico ou mensagem genérica de carinho.
+5. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use a linguagem poética, profunda e acolhedora dos livros, adaptada à relação (ex: pai para filho = proteção e legado; esposa = intimidade e presença).
+6. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
+7. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
 
-Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas de perto:
+Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas:
 ${previousMessages || "- nenhuma nesta sessão"}
 
-Regras de escrita:
-- Escreva em português do Brasil.
-- Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você).
-- Não use tom de autoajuda genérica.
-- Não copie trechos longos literalmente dos livros.
-- Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
-- Não use título.
-- Não use lista.
-- Entregue SOMENTE o texto final. Nada de comentários antes ou depois.
-
-Frases proibidas (bloqueio rigoroso):
+Frases e clichês proibidos (bloqueio rigoroso):
 ${blockedPhrases}
 `.trim();
 
   try {
-    let aiText = cleanGeneratedText(await generateAIMsg(prompt));
+    const aiText = cleanGeneratedText(await generateAIMsg(prompt));
     
-    // VALIDAÇÃO DE NEGÓCIO: Pedido de Desculpas
+    // VALIDAÇÃO DE NEGÓCIO: Pedido de Desculpas (mantida conforme solicitado)
     const isApology = /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.occasion || "") || 
                       /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.intention || "");
     
     let finalText = aiText;
-    let validationResult = "aprovado";
 
     if (isApology) {
       const lowerText = finalText.toLowerCase();
@@ -847,34 +819,22 @@ ${blockedPhrases}
       const matchCount = requiredTerms.filter(term => lowerText.includes(term)).length;
       
       if (matchCount < 2) {
-        validationResult = "reprovado";
         console.log("[VALIDACAO_OCASIAO]");
         console.log("occasion:", data.occasion || data.intention);
         console.log("texto_final:", finalText);
-        console.log("resultado:", validationResult);
-        
-        // Usar fallback específico de pedido de desculpas
+        console.log("resultado: reprovado (usando fallback de segurança)");
         finalText = buildApologyFallback(data);
       } else {
         console.log("[VALIDACAO_OCASIAO]");
         console.log("occasion:", data.occasion || data.intention);
         console.log("texto_final:", finalText);
-        console.log("resultado:", validationResult);
+        console.log("resultado: aprovado");
       }
-    }
-
-    // Verificação final de frases genéricas ou similaridade
-    if (containsGenericPhrase(finalText) || isTooSimilarToPrevious(finalText, data.previousMessages)) {
-       if (isApology) {
-           finalText = buildApologyFallback(data);
-       } else {
-           finalText = buildFallback(data, seeds);
-       }
     }
 
     return rememberGeneratedMessage(finalText);
   } catch (error) {
-    console.warn("IA indisponível, usando base autoral local:", error);
+    console.warn("IA indisponível, usando base autoral local (fallback):", error);
     const isApology = /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.occasion || "") || 
                       /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.intention || "");
     if (isApology) {
