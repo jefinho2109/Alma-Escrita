@@ -72,6 +72,19 @@ const BLOCKED_PHRASES = [
   "o que tento dizer",
   "entrego estas palavras",
   "não escrevo para impressionar",
+  "oração pequena",
+  "receba isso",
+  "entrego esta mensagem",
+  "quero dizer",
+  "quero expressar",
+  "sinto necessidade de dizer",
+  "para que você sinta",
+  "verdade simples",
+  "cuidado que existe aqui",
+  "escrevo para que você sinta",
+  "frase pronta",
+  "poucas linhas",
+  "resumir tudo",
 ] as const;
 
 const simpleTextCorrections: Array<[RegExp, string]> = [
@@ -103,25 +116,25 @@ const fallbackOpenings = {
     "Tem dias em que a alma só precisa ser tratada com presença.",
   ],
   named: [
-    "que este carinho chegue sem pressa, mas com presença inteira.",
-    "transformo este sentimento em cuidado, porque afeto sincero também é abrigo.",
+    "uma das coisas que mais admiro em você é a forma como consegue trazer calma aos dias difíceis.",
+    "quando penso nos momentos que vivemos, lembro da força e da bondade que você demonstra nas pequenas atitudes.",
     "há laços que ficam maiores quando a vida nos testa de verdade.",
-    "trago no peito a delicadeza de quem quer tocar sem invadir e permanecer sem pesar.",
+    "trago no peito a certeza de que sua presença faz toda a diferença no meu caminho.",
   ],
 };
 
 const bridgeSentences = [
-  "O que sinto não cabe em frase pronta; precisa respirar com ternura, verdade e um pouco de silêncio.",
+  "O que sinto precisa respirar com ternura, verdade e um pouco de silêncio.",
   "Dentro desse sentimento existe cuidado, existe escolha e existe uma forma bonita de permanecer.",
   "A vida me ensinou que o que é profundo não precisa repetir caminhos: encontra uma forma nova de chegar.",
-  "Entre o que a alma sente e o que a boca consegue dizer, escolho te entregar presença.",
-  "Que cada gesto carregue mais do que som: carregue intenção, memória boa e carinho vivo.",
+  "Entre o que a alma sente e a vida nos mostra, escolho te entregar presença.",
+  "Que cada gesto carregue intenção, memória boa e carinho vivo.",
 ];
 
 const closingSentences = [
   "Que fique em você o essencial: meu carinho é presença, não aparência.",
-  "Receba isso como quem recebe uma oração mansa: com verdade, cuidado e paz.",
-  "E que o seu coração entenda o que o meu afeto só consegue começar.",
+  "Que a paz e o cuidado que sinto por você permaneçam no seu coração.",
+  "E que o seu coração sinta todo o afeto que tenho por você.",
   "Fica aqui meu afeto, simples por fora e profundo por dentro.",
   "Que este carinho encontre em você um lugar bonito para permanecer.",
 ];
@@ -165,8 +178,8 @@ const styleSentences: Record<VariationStyle, string[]> = {
     "Que esta palavra levante algo bom dentro de você, como força serena para seguir com o coração mais leve.",
   ],
   "carta curta": [
-    "Deixo aqui poucas linhas, mas com uma intenção inteira atravessando cada frase.",
-    "Se eu pudesse resumir tudo, diria que meu cuidado por você merece chegar limpo, direto e verdadeiro.",
+    "Meu cuidado por você chega limpo, direto e verdadeiro, atravessando qualquer distância.",
+    "Meu carinho por você é inteiro, direto e verdadeiro, sem precisar de rodeios.",
   ],
   "declaração intensa": [
     "O que sinto não passa pela superfície; chega inteiro, firme e cheio de presença.",
@@ -615,18 +628,20 @@ HIERARQUIA ABSOLUTA DE CONTEÚDO:
 5. Memória compartilhada: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
 6. Voz Poeta Sonhador: APENAS o estilo (ritmo, metáforas concretas), NUNCA o assunto.
 
-REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA):
+REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA CRÍTICA):
 1. A IA NÃO EXISTE. Você é o Remetente falando diretamente com o Destinatário.
-2. NUNCA fale sobre o ato de escrever. É estritamente proibido usar: "escrevo", "escrita", "mensagem", "palavras", "texto", "poesia", "o que tento dizer", "esta mensagem", "entrego estas palavras", "não escrevo para impressionar".
-3. NUNCA descreva o tom ou o processo. Proibido: "o tom que nasce aqui", "espiritual, íntimo, esperançoso", "esta versão", "esta reflexão", "esta homenagem", "tom", "narrativa".
-4. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencioná-lo ou aludir a ele de forma concreta no corpo do texto. Não diga apenas "lembro daquela vez", descreva a cena ou o sentimento daquela cena.
+2. É ESTRITAMENTE PROIBIDO falar sobre o ato de escrever ou sobre o próprio texto. NUNCA use variações de: "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem", "quero dizer", "quero expressar", "sinto necessidade de dizer", "para que você sinta", "verdade simples", "cuidado que existe aqui", "não escrevo para impressionar".
+3. A mensagem deve começar falando DA PESSOA, da relação, da ocasião ou da memória compartilhada. NUNCA comece falando sobre escrever, sobre o texto ou sobre a mensagem.
+   - ERRADO: "Alessandra, não escrevo para impressionar..."
+   - CERTO: "Alessandra, uma das coisas que mais admiro em você é a forma como consegue trazer calma aos dias difíceis."
+   - ERRADO: "Entrego esta mensagem como oração pequena..."
+   - CERTO: "Quando penso nos momentos que vivemos, lembro da força e da bondade que você demonstra nas pequenas atitudes."
+4. O CENTRO da geração é a PESSOA e a MEMÓRIA COMPARTILHADA. Se o campo "Memória compartilhada" foi fornecido, você DEVE mencioná-lo ou aludir a ele de forma concreta no corpo do texto.
 5. PRIORIZE FATOS CONCRETOS sobre abstrações.
    - ERRADO: "o amor aparece como caminho possível"
    - CERTO: "você esteve ao meu lado quando eu mais precisei"
    - ERRADO: "amizade como gesto"
    - CERTO: "você me ouviu quando ninguém mais ouviu"
-   - ERRADO: "Você ocupa um lugar especial e sua presença ilumina os dias."
-   - CERTO: "Eu ainda lembro daquela tarde em que você ficou horas me ouvindo quando eu não sabia o que fazer. Naquele dia percebi o tamanho do seu coração."
 
 Gere UMA resposta direta, profunda, emocional e pronta para compartilhar.
 
@@ -648,7 +663,7 @@ Base autoral ampliada extraída dos livros e poemas do projeto:
 ${authorContext}
 
 Método autoral obrigatório:
-- Comece DIRETAMENTE tratando a pessoa pelo nome ou pelo vínculo, sem introduções genéricas.
+- Comece DIRETAMENTE tratando a pessoa pelo nome ou pelo vínculo, citando uma qualidade, um momento ou a memória compartilhada.
 - Se houver uma memória especial, faça dela o coração da mensagem. Use os detalhes fornecidos de forma orgânica e concreta.
 - Incorpore o FFP (Fé, Força, Paciência) como a espinha dorsal invisível da mensagem, não como um slogan.
 - Termine com uma frase marcante, madura e humana, reafirmando o vínculo.
