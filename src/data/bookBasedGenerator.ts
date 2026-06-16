@@ -791,11 +791,12 @@ ${authorContext}
 REGRAS ABSOLUTAS DE ESCRITA:
 1. ESCREVA DO ZERO: Não use templates, fórmulas ou estruturas fixas. Cada mensagem deve ser única e fluida.
 2. NÃO COPIE TRECHOS: Use os temas, vocabulário e ensinamentos acima apenas como inspiração. Nunca cole frases de impacto ou reflexão literalmente.
-3. INTEGRE O DETALHE: Se houver um detalhe ou memória, funde-o naturalmente na narrativa. Não o cole de forma bruta ou isolada.
-4. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade. É ESTRITAMENTE PROIBIDO transformar um pedido de desculpas em declaração de amor romântico ou mensagem genérica de carinho.
-5. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use a linguagem poética, profunda e acolhedora dos livros, adaptada à relação (ex: pai para filho = proteção e legado; esposa = intimidade e presença).
-6. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
-7. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
+3. INTERPRETAÇÃO DO DETALHE (REGRA CRÍTICA): Se o usuário informar uma frase completa ou ideia (ex: "você foi e será minha melhor escolha"), é ESTRITAMENTE PROIBIDO repetir a frase literalmente, usar aspas ou copiar e colar o detalhe no corpo da mensagem. Você DEVE INTERPRETAR a ideia e desenvolvê-la em uma narrativa emocional única (ex: "Entre todas as escolhas que a vida me permitiu fazer, você continua sendo aquela que mais alegra o meu coração").
+4. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
+5. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade. É ESTRITAMENTE PROIBIDO transformar um pedido de desculpas em declaração de amor romântico ou mensagem genérica de carinho.
+6. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use a linguagem poética, profunda e acolhedora dos livros, adaptada à relação (ex: pai para filho = proteção e legado; esposa = intimidade e presença).
+7. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
+8. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
 
 Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas:
 ${previousMessages || "- nenhuma nesta sessão"}

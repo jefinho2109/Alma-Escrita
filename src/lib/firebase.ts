@@ -3,10 +3,12 @@ import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
   getAuth,
+  GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
   type Auth,
@@ -121,6 +123,15 @@ export function watchAuthState(onChange: (user: AppUser | null) => void): () => 
 export async function loginWithEmail(email: string, password: string): Promise<AppUser> {
   const auth = await requireAuth();
   const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+  const user = mapFirebaseUser(credential.user);
+  if (!user) throw new Error("auth/user-not-found");
+  return user;
+}
+
+export async function loginWithGoogle(): Promise<AppUser> {
+  const auth = await requireAuth();
+  const provider = new GoogleAuthProvider();
+  const credential = await signInWithPopup(auth, provider);
   const user = mapFirebaseUser(credential.user);
   if (!user) throw new Error("auth/user-not-found");
   return user;
