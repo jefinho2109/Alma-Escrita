@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 
 type GenRecipient =
   | "mim"
+  | "amor"
   | "mãe"
   | "pai"
   | "irmão"
@@ -12,10 +13,12 @@ type GenRecipient =
   | "amiga"
   | "esposa"
   | "esposo"
+  | "marido"
   | "namorado"
   | "namorada"
   | "filho"
   | "filha"
+  | "família"
   | "outro";
 
 type GenTone =
@@ -33,6 +36,12 @@ type GenLength = "curta" | "média" | "longa";
 interface GenRequest {
   recipient: GenRecipient;
   name: string;
+  senderName?: string;
+  relationship?: string;
+  occasion?: string;
+  sharedMemory?: string;
+  messageStart?: string;
+  premiumMessage?: boolean;
   intention: string;
   tone: GenTone;
   length: GenLength;
@@ -105,6 +114,7 @@ function parseBody(req: any): Record<string, unknown> {
 
 const GEN_RECIPIENTS: GenRecipient[] = [
   "mim",
+  "amor",
   "mãe",
   "pai",
   "irmão",
@@ -113,10 +123,12 @@ const GEN_RECIPIENTS: GenRecipient[] = [
   "amiga",
   "esposa",
   "esposo",
+  "marido",
   "namorado",
   "namorada",
   "filho",
   "filha",
+  "família",
   "outro",
 ];
 
@@ -139,7 +151,7 @@ const TONE_OPENINGS: Record<GenTone, string[]> = {
     "existem sentimentos que chegam mansos e ficam eternos",
   ],
   emocionante: [
-    "algumas verdades só cabem quando a alma fala sem pressa",
+    "algumas verdades só cabem quando o coração fala sem pressa",
     "tem palavras que nascem do lugar mais bonito do peito",
   ],
   fé: [
@@ -147,23 +159,23 @@ const TONE_OPENINGS: Record<GenTone, string[]> = {
     "a fé acende luz até nos dias em que o coração quase apaga",
   ],
   gratidão: [
-    "gratidão é quando a alma percebe que recebeu mais do que palavras explicam",
+    "gratidão é quando o coração reconhece que recebeu mais do que palavras explicam",
     "agradecer é guardar no coração aquilo que a vida fez florescer",
   ],
   perdão: [
     "perdoar não apaga a história, mas devolve ar ao coração",
-    "há curas que começam quando a alma decide não viver presa à dor",
+    "há curas que começam quando a pessoa decide não viver presa à dor",
   ],
   saudade: [
     "a saudade é presença que aprendeu a morar no silêncio",
-    "existem ausências que continuam tocando a alma com ternura",
+    "existem ausências que continuam tocando a memória com ternura",
   ],
   motivacional: [
-    "quem ainda respira esperança já começou a vencer por dentro",
-    "mesmo devagar, cada passo sincero aproxima a alma do recomeço",
+    "quem escolhe a coragem já começou a vencer por dentro",
+    "mesmo devagar, cada passo sincero aproxima você do recomeço",
   ],
   reflexão: [
-    "a vida ensina mais quando a alma aceita escutar com calma",
+    "a vida ensina mais quando a gente aceita escutar com calma",
     "há dias que não mudam tudo, mas revelam o que precisa florescer",
   ],
 };
@@ -173,6 +185,180 @@ const LENGTH_SENTENCES: Record<GenLength, number> = {
   média: 3,
   longa: 5,
 };
+
+type EmotionalUniverseKey =
+  | "amor"
+  | "fe"
+  | "amizade"
+  | "pedido_desculpas"
+  | "gratidao"
+  | "reflexao"
+  | "motivacao"
+  | "aniversario";
+
+interface ServerUniverse {
+  key: EmotionalUniverseKey;
+  label: string;
+  allowed: string[];
+  blocked: string[];
+}
+
+const SERVER_SPIRITUAL_BLOCKS = [
+  "Deus",
+  "fé",
+  "oração",
+  "orar",
+  "alma",
+  "esperança espiritual",
+  "espiritual",
+  "espiritualidade",
+  "Senhor",
+  "milagre",
+  "céu",
+  "propósito divino",
+];
+
+const SERVER_ROMANTIC_BLOCKS = [
+  "romance",
+  "romântico",
+  "paixão",
+  "apaixonado",
+  "beijo",
+  "beijar",
+  "lábios",
+  "desejo",
+  "meu amor",
+  "minha vida",
+  "namorado",
+  "namorada",
+  "casal",
+];
+
+const SERVER_UNIVERSES: Record<EmotionalUniverseKey, ServerUniverse> = {
+  amor: {
+    key: "amor",
+    label: "AMOR",
+    allowed: [
+      "carinho",
+      "afeto",
+      "presença",
+      "saudade",
+      "desejo respeitoso",
+      "admiração",
+      "companheirismo",
+      "escolha",
+      "romance",
+    ],
+    blocked: [...SERVER_SPIRITUAL_BLOCKS, "esperança"],
+  },
+  fe: {
+    key: "fe",
+    label: "FÉ",
+    allowed: ["Deus", "oração", "esperança", "propósito", "confiança", "espiritualidade"],
+    blocked: SERVER_ROMANTIC_BLOCKS,
+  },
+  amizade: {
+    key: "amizade",
+    label: "AMIZADE",
+    allowed: ["apoio", "parceria", "lealdade", "companheirismo", "presença"],
+    blocked: SERVER_ROMANTIC_BLOCKS,
+  },
+  pedido_desculpas: {
+    key: "pedido_desculpas",
+    label: "PEDIDO DE DESCULPAS",
+    allowed: ["erro", "responsabilidade", "arrependimento", "perdão", "reconstrução"],
+    blocked: [...SERVER_SPIRITUAL_BLOCKS, ...SERVER_ROMANTIC_BLOCKS],
+  },
+  gratidao: {
+    key: "gratidao",
+    label: "GRATIDÃO",
+    allowed: ["reconhecimento", "importância", "lembrança", "gratidão"],
+    blocked: [...SERVER_SPIRITUAL_BLOCKS, ...SERVER_ROMANTIC_BLOCKS],
+  },
+  reflexao: {
+    key: "reflexao",
+    label: "REFLEXÃO",
+    allowed: ["aprendizado", "maturidade", "tempo", "crescimento"],
+    blocked: [...SERVER_SPIRITUAL_BLOCKS, ...SERVER_ROMANTIC_BLOCKS],
+  },
+  motivacao: {
+    key: "motivacao",
+    label: "MOTIVAÇÃO",
+    allowed: ["coragem", "recomeço", "força", "perseverança"],
+    blocked: [...SERVER_SPIRITUAL_BLOCKS, ...SERVER_ROMANTIC_BLOCKS],
+  },
+  aniversario: {
+    key: "aniversario",
+    label: "ANIVERSÁRIO",
+    allowed: ["celebração", "alegria", "vida", "bênçãos"],
+    blocked: [...SERVER_SPIRITUAL_BLOCKS, ...SERVER_ROMANTIC_BLOCKS],
+  },
+};
+
+function normalizeUniverseText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function includesUniverseTerm(text: string, term: string): boolean {
+  const normalizedText = ` ${normalizeUniverseText(text)} `;
+  const normalizedTerm = normalizeUniverseText(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|[^a-z0-9])${normalizedTerm.replace(/\s+/g, "\\s+")}([^a-z0-9]|$)`);
+  return pattern.test(normalizedText);
+}
+
+function resolveServerUniverse(request: GenRequest): ServerUniverse {
+  const joined = normalizeUniverseText(
+    [
+      request.tone,
+      request.occasion,
+      request.relationship,
+      request.recipient,
+      request.intention,
+      request.sharedMemory,
+      request.messageStart,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  if (
+    request.tone === "perdão" ||
+    /pedido de desculpas|desculpa|perdao|erro|errei|arrepend/.test(joined)
+  ) {
+    return SERVER_UNIVERSES.pedido_desculpas;
+  }
+  if (/aniversario|celebracao|parabens/.test(joined)) return SERVER_UNIVERSES.aniversario;
+  if (request.tone === "romântica") return SERVER_UNIVERSES.amor;
+  if (request.tone === "fé") return SERVER_UNIVERSES.fe;
+  if (request.tone === "gratidão") return SERVER_UNIVERSES.gratidao;
+  if (request.tone === "motivacional") return SERVER_UNIVERSES.motivacao;
+  if (request.tone === "reflexão") return SERVER_UNIVERSES.reflexao;
+  if (/amig/.test(joined)) return SERVER_UNIVERSES.amizade;
+  return SERVER_UNIVERSES.reflexao;
+}
+
+function isAllowedForServerUniverse(text: string, universe: ServerUniverse): boolean {
+  return !universe.blocked.some((term) => includesUniverseTerm(text, term));
+}
+
+function buildServerUniverseFallback(request: GenRequest): string {
+  const name = request.name?.trim() || "você";
+  const universe = resolveServerUniverse(request);
+  const messages: Record<EmotionalUniverseKey, string> = {
+    amor: `${name}, eu sinto carinho por você de um jeito que pede presença, afeto e cuidado. A saudade aumenta meu desejo respeitoso de estar perto, admirando seus detalhes e escolhendo esse romance com companheirismo.`,
+    fe: `${name}, sigo confiando em Deus e levando em oração o que ainda precisa amadurecer. Que a esperança fortaleça seu propósito e renove sua confiança com serenidade espiritual.`,
+    amizade: `${name}, sua presença tem valor de parceria verdadeira. Obrigado pelo apoio, pela lealdade e pelo companheirismo que tornam nossa amizade um lugar de cuidado sincero.`,
+    pedido_desculpas: `${name}, reconheço meu erro e assumo a responsabilidade pelo que aconteceu. Sinto arrependimento sincero, peço perdão de coração e quero reconstruir a confiança com atitudes melhores.`,
+    gratidao: `${name}, guardo reconhecimento pela sua importância na minha vida. Cada lembrança do seu cuidado aumenta minha gratidão e me faz valorizar ainda mais o que você representa.`,
+    reflexao: `${name}, este momento me chama para aprendizado e maturidade. O tempo mostra caminhos de crescimento, e eu quero acolher essa fase com calma e consciência.`,
+    motivacao: `${name}, respire e siga com coragem. Todo recomeço pede força, mas a perseverança transforma passos pequenos em uma caminhada firme.`,
+    aniversario: `${name}, hoje é dia de celebração, alegria e vida. Que este novo ciclo chegue com bênçãos, boas lembranças e motivos bonitos para sorrir.`,
+  };
+  return messages[universe.key];
+}
 
 function pick<T>(values: T[]): T {
   return values[Math.floor(Math.random() * values.length)]!;
@@ -188,6 +374,12 @@ function normalizeGenRequest(request: GenRequest): GenRequest {
       ? request.recipient
       : "mim",
     name: request.name.trim(),
+    senderName: request.senderName?.trim(),
+    relationship: request.relationship?.trim(),
+    occasion: request.occasion?.trim(),
+    sharedMemory: request.sharedMemory?.trim(),
+    messageStart: request.messageStart?.trim(),
+    premiumMessage: Boolean(request.premiumMessage),
     intention: request.intention.trim(),
     tone: GEN_TONES.includes(request.tone) ? request.tone : "emocionante",
     length: GEN_LENGTHS.includes(request.length) ? request.length : "média",
@@ -211,7 +403,7 @@ function buildLocalFallbackMessage(request: GenRequest): string {
       : data.tone === "romântica"
         ? "Eu queria que você soubesse o quanto sou grato por tudo o que você faz por mim e por tudo o que você desperta em mim."
         : data.tone === "gratidão"
-          ? "Eu agradeço, do fundo da alma, por cada gesto seu que me sustenta e me faz sentir cuidado."
+          ? "Eu agradeço, com reconhecimento sincero, por cada gesto seu que me sustenta e me faz sentir cuidado."
           : data.tone === "saudade"
             ? "Eu sinto a sua falta de um jeito que ainda mora em mim e insiste em pedir um pouco mais de presença."
             : data.tone === "fé"
@@ -225,13 +417,16 @@ function buildLocalFallbackMessage(request: GenRequest): string {
   const sentences = [
     firstSentence,
     secondSentence,
-    "Escrevo como quem confessa o que a alma não consegue guardar em silêncio.",
-    "Que estas palavras cheguem como abraço, presença e luz no ponto exato onde o coração precisa sentir.",
+    "Digo isso com a sinceridade de quem guarda esse sentimento no peito.",
+    "Que este carinho chegue como abraço, presença e cuidado no ponto exato onde o coração precisa sentir.",
     "Nem tudo que é profundo precisa ser complicado; às vezes, basta uma palavra sincera para tocar uma vida inteira.",
-    "E que fique o essencial: quando a alma fala com amor, até o silêncio entende.",
+    "E que fique o essencial: quando o afeto é verdadeiro, até o silêncio entende.",
   ];
 
-  return sentences.slice(0, LENGTH_SENTENCES[data.length]).join(" ");
+  const text = sentences.slice(0, LENGTH_SENTENCES[data.length]).join(" ");
+  return isAllowedForServerUniverse(text, resolveServerUniverse(data))
+    ? text
+    : buildServerUniverseFallback(data);
 }
 
 function parseStructuredPrompt(prompt: string): GenRequest {
@@ -293,6 +488,25 @@ function parseStructuredPrompt(prompt: string): GenRequest {
     intention,
     tone,
     length: length as GenLength,
+  });
+}
+
+function parseGenerationRequest(value: unknown): GenRequest | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<GenRequest>;
+
+  return normalizeGenRequest({
+    recipient: (raw.recipient || "outro") as GenRecipient,
+    name: String(raw.name || ""),
+    senderName: raw.senderName ? String(raw.senderName) : undefined,
+    relationship: raw.relationship ? String(raw.relationship) : undefined,
+    occasion: raw.occasion ? String(raw.occasion) : undefined,
+    sharedMemory: raw.sharedMemory ? String(raw.sharedMemory) : undefined,
+    messageStart: raw.messageStart ? String(raw.messageStart) : undefined,
+    premiumMessage: Boolean(raw.premiumMessage),
+    intention: String(raw.intention || raw.sharedMemory || ""),
+    tone: (raw.tone || "emocionante") as GenTone,
+    length: (raw.length || "média") as GenLength,
   });
 }
 
@@ -421,35 +635,151 @@ function normalizeForSearch(text: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function scoreBookSource(source: BookSource, prompt: string): number {
+function isBookSourceAllowed(source: BookSource, universe: ServerUniverse): boolean {
+  const searchable = [
+    source.title,
+    source.category,
+    source.tags.join(" "),
+    source.tone,
+    source.content,
+  ].join(" ");
+  return isAllowedForServerUniverse(searchable, universe);
+}
+
+function scoreBookSource(source: BookSource, prompt: string, universe: ServerUniverse): number {
   const searchable = normalizeForSearch(
     `${source.title} ${source.category} ${source.tags.join(" ")} ${source.tone} ${source.content}`,
   );
   const promptText = normalizeForSearch(prompt);
-  const keywords = [
-    "romance",
-    "amor",
-    "saudade",
-    "fe",
-    "reflexao",
-    "superacao",
-    "amizade",
-    "mae",
-    "familia",
-    "gratidao",
-    "distancia",
-    "perdao",
-    "casal",
-  ];
+  const keywords = universe.allowed.map((term) => normalizeForSearch(term));
 
   return keywords.reduce((score, keyword) => {
-    return promptText.includes(keyword) && searchable.includes(keyword)
-      ? score + 3
-      : score;
+    if (!keyword) return score;
+    if (promptText.includes(keyword) && searchable.includes(keyword)) return score + 4;
+    if (searchable.includes(keyword)) return score + 2;
+    return score;
   }, 0);
 }
 
-async function fetchBookSources(prompt: string): Promise<BookSource[]> {
+const SOURCE_VOICE_STOPWORDS = new Set([
+  "a",
+  "ao",
+  "aos",
+  "as",
+  "com",
+  "como",
+  "da",
+  "das",
+  "de",
+  "do",
+  "dos",
+  "e",
+  "em",
+  "entre",
+  "essa",
+  "esse",
+  "esta",
+  "este",
+  "isso",
+  "mais",
+  "minha",
+  "meu",
+  "na",
+  "nas",
+  "no",
+  "nos",
+  "o",
+  "os",
+  "ou",
+  "para",
+  "por",
+  "que",
+  "sem",
+  "ser",
+  "sua",
+  "seu",
+  "uma",
+  "voce",
+]);
+
+const SOURCE_METAPHOR_TERMS = [
+  "abrigo",
+  "caminho",
+  "casa",
+  "cicatriz",
+  "cuidado",
+  "estrada",
+  "janela",
+  "luz",
+  "memoria",
+  "passo",
+  "presenca",
+  "raiz",
+  "silencio",
+  "tempo",
+];
+
+function collectSafeSignals(values: string[], universe: ServerUniverse, limit: number): string[] {
+  const seen = new Set<string>();
+  const signals: string[] = [];
+
+  for (const value of values) {
+    const signal = value.replace(/\s+/g, " ").trim();
+    const key = normalizeForSearch(signal);
+    if (!signal || signal.length < 3 || signal.length > 70) continue;
+    if (SOURCE_VOICE_STOPWORDS.has(key)) continue;
+    if (!isAllowedForServerUniverse(signal, universe)) continue;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    signals.push(signal);
+    if (signals.length >= limit) break;
+  }
+
+  return signals;
+}
+
+function collectFrequentSourceWords(content: string, universe: ServerUniverse, limit: number): string[] {
+  const counts = new Map<string, number>();
+  const words = normalizeForSearch(content)
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  for (const word of words) {
+    if (word.length < 4) continue;
+    if (SOURCE_VOICE_STOPWORDS.has(word)) continue;
+    if (!isAllowedForServerUniverse(word, universe)) continue;
+    counts.set(word, (counts.get(word) || 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([word]) => word)
+    .slice(0, limit);
+}
+
+function buildBookSourceVoiceContext(source: BookSource, index: number, universe: ServerUniverse): string {
+  const metadata = collectSafeSignals(
+    [source.category, source.tone, ...source.tags],
+    universe,
+    8,
+  );
+  const words = collectFrequentSourceWords(source.content, universe, 10);
+  const metaphors = words.filter((word) =>
+    SOURCE_METAPHOR_TERMS.some((image) => word.includes(image)),
+  );
+
+  return [
+    `${index + 1}. Fonte dinamica: ${source.title}`,
+    `Sinais tematicos compativeis: ${metadata.join(", ") || universe.allowed.join(", ")}.`,
+    `Palavras recorrentes seguras: ${words.join(", ") || universe.allowed.join(", ")}.`,
+    `Metaforas/imagens permitidas: ${(metaphors.length ? metaphors : universe.allowed).slice(0, 6).join(", ")}.`,
+    "Aplicacao: usar estes dados apenas como perfil de voz. Nao copiar frases, trechos ou explicacoes da fonte.",
+  ].join("\n");
+}
+
+async function fetchBookSources(prompt: string, universe: ServerUniverse): Promise<BookSource[]> {
   const serviceAccount = readFirebaseServiceAccount();
   if (!serviceAccount) return [];
 
@@ -494,29 +824,24 @@ async function fetchBookSources(prompt: string): Promise<BookSource[]> {
   return (Array.isArray(rows) ? rows : [])
     .map(decodeBookSource)
     .filter((source: BookSource | null): source is BookSource => source !== null)
-    .sort((a: BookSource, b: BookSource) => scoreBookSource(b, prompt) - scoreBookSource(a, prompt))
+    .filter((source) => isBookSourceAllowed(source, universe))
+    .sort((a: BookSource, b: BookSource) => scoreBookSource(b, prompt, universe) - scoreBookSource(a, prompt, universe))
     .slice(0, 6);
 }
 
-async function enrichPromptWithBookSources(prompt: string): Promise<string> {
+async function enrichPromptWithBookSources(prompt: string, request: GenRequest): Promise<string> {
   try {
-    const sources = await fetchBookSources(prompt);
+    const universe = resolveServerUniverse(request);
+    const sources = await fetchBookSources(prompt, universe);
     if (sources.length === 0) return prompt;
 
     let used = 0;
     const context = sources
       .map((source, index) => {
-        const snippet = source.content.slice(0, 520).trim();
-        used += snippet.length;
+        const profile = buildBookSourceVoiceContext(source, index, universe);
+        used += profile.length;
         if (used > MAX_BOOK_CONTEXT_CHARS) return "";
-
-        return [
-          `${index + 1}. Titulo: ${source.title}`,
-          `Categoria: ${source.category}`,
-          `Tags: ${source.tags.join(", ") || "geral"}`,
-          `Tom: ${source.tone}`,
-          `Trecho: ${snippet}`,
-        ].join("\n");
+        return profile;
       })
       .filter(Boolean)
       .join("\n\n");
@@ -524,9 +849,11 @@ async function enrichPromptWithBookSources(prompt: string): Promise<string> {
     if (!context) return prompt;
 
     const enriched = `
-Base dinâmica do Firestore (coleção book_sources).
-Use estes trechos apenas como inspiração de tema, tom e sensibilidade.
-Não copie frases integralmente, não cite livros, Firestore, base, prompt ou IA.
+Base dinamica do Firestore (colecao book_sources) convertida em perfil de voz.
+Universo emocional ativo: ${universe.label}.
+Use estes sinais apenas como estilo, ritmo, vocabulario e metaforas dentro desse universo.
+O universo emocional do pedido define a categoria. A base dinamica nao pode alterar essa categoria.
+Nao copie frases, trechos ou explicacoes da fonte. Nao cite livros, Firestore, base, prompt ou IA.
 
 ${context}
 
@@ -557,6 +884,7 @@ export default async function handler(req: any, res: any) {
 
   const body = parseBody(req);
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+  const structuredRequest = parseGenerationRequest(body.generationRequest) || parseStructuredPrompt(prompt);
 
   if (!prompt) {
     return res.status(400).json({ error: "Prompt obrigatorio." });
@@ -567,9 +895,8 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!GEMINI_API_KEY) {
-    const structured = parseStructuredPrompt(prompt);
     return res.status(200).json({
-      text: buildLocalFallbackMessage(structured),
+      text: buildLocalFallbackMessage(structuredRequest),
       fallback: true,
     });
   }
@@ -582,7 +909,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const finalPrompt = await enrichPromptWithBookSources(prompt);
+    const finalPrompt = await enrichPromptWithBookSources(prompt, structuredRequest);
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
       {

@@ -3,11 +3,20 @@ import {
   AUTHOR_VOICE_SEEDS,
   AUTHOR_VOICE_STATS,
   GENERIC_PHRASE_BLOCKLIST,
-  GOLDEN_SEEDS,
-  buildAuthorVoiceContext,
   findAuthorVoiceSeeds,
   type AuthorVoiceSeed,
 } from "@/data/authorVoiceKnowledge";
+import {
+  EMOTIONAL_UNIVERSES,
+  buildEmotionalUniverseFallback,
+  buildUniversePromptBlock,
+  buildValidationRetryInstruction,
+  isTextAllowedInUniverse,
+  normalizeUniverseText,
+  resolveEmotionalUniverse,
+  validateEmotionalUniverseText,
+  type EmotionalUniverseKey,
+} from "@/data/emotionalUniverses";
 import {
   type GenRequest,
   type GenTone,
@@ -376,8 +385,42 @@ function isTooSimilarToPrevious(text: string, previousMessages: string[] = []): 
   });
 }
 
-function styleForGeneration(generationId: string): VariationStyle {
-  return variationStyles[hashString(generationId) % variationStyles.length]!;
+function repeatsMessageStart(text: string, messageStart?: string): boolean {
+  const start = cleanGeneratedText(messageStart || "");
+  if (start.length < 18) return false;
+
+  const normalizedText = normalizeUniverseText(cleanGeneratedText(text));
+  const normalizedStart = normalizeUniverseText(start);
+  return normalizedText.includes(normalizedStart);
+}
+
+function stylesForUniverse(universeKey: EmotionalUniverseKey): VariationStyle[] {
+  switch (universeKey) {
+    case "amor":
+      return ["romântico", "simples", "poético", "declaração intensa"];
+    case "fe":
+      return ["espiritual", "profundo", "simples"];
+    case "amizade":
+      return ["simples", "profundo", "motivacional"];
+    case "pedido_desculpas":
+      return ["simples", "profundo", "carta curta"];
+    case "gratidao":
+      return ["simples", "profundo", "carta curta"];
+    case "reflexao":
+      return ["profundo", "simples", "poético"];
+    case "motivacao":
+      return ["motivacional", "simples", "profundo"];
+    case "aniversario":
+      return ["simples", "poético", "carta curta"];
+  }
+}
+
+function styleForUniverse(
+  generationId: string,
+  universeKey: EmotionalUniverseKey,
+): VariationStyle {
+  const styles = stylesForUniverse(universeKey);
+  return styles[hashString(`${generationId}-${universeKey}`) % styles.length]!;
 }
 
 function rememberGeneratedMessage(text: string): string {
@@ -413,6 +456,232 @@ function destinationFor(data: GenRequest): string {
   if (data.recipient === "mim") return "a própria pessoa que está escrevendo";
   if (data.name) return `${data.recipient} chamada ${data.name}`;
   return data.recipient;
+}
+
+function safeSeedPieces(
+  values: string[],
+  universeKey: EmotionalUniverseKey,
+): string[] {
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => isTextAllowedInUniverse(value, universeKey));
+}
+
+const AUTHOR_VOICE_STOPWORDS = new Set([
+  "a",
+  "ao",
+  "aos",
+  "as",
+  "com",
+  "como",
+  "da",
+  "das",
+  "de",
+  "do",
+  "dos",
+  "e",
+  "em",
+  "entre",
+  "essa",
+  "esse",
+  "esta",
+  "este",
+  "isso",
+  "mais",
+  "na",
+  "nas",
+  "no",
+  "nos",
+  "o",
+  "os",
+  "ou",
+  "para",
+  "por",
+  "que",
+  "sem",
+  "ser",
+  "sua",
+  "seu",
+  "um",
+  "uma",
+]);
+
+const AUTHOR_VOICE_METAPHOR_TERMS = [
+  "abrigo",
+  "caminho",
+  "casa",
+  "chao",
+  "cicatriz",
+  "cuidado",
+  "detalhe",
+  "estrada",
+  "janela",
+  "luz",
+  "memoria",
+  "passo",
+  "presenca",
+  "raiz",
+  "silencio",
+  "tempo",
+];
+
+const DEFAULT_AUTHOR_RHYTHM = [
+  "primeira pessoa direta",
+  "frases medias com fechamento breve",
+  "imagem concreta antes da conclusao",
+  "profundidade sem moralizar",
+  "acolhimento sem cliche motivacional",
+];
+
+interface AuthorVoiceProfile {
+  sourceBooks: string[];
+  sourceFiles: string[];
+  seedCount: number;
+  themes: string[];
+  vocabulary: string[];
+  metaphors: string[];
+  rhythm: string[];
+}
+
+function normalizeVoiceSignal(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function uniqueSignals(values: string[], universeKey: EmotionalUniverseKey, limit: number): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+
+  for (const raw of values) {
+    const signal = normalizeVoiceSignal(raw);
+    const key = normalizeUniverseText(signal);
+
+    if (!signal || signal.length < 3 || signal.length > 70) continue;
+    if (AUTHOR_VOICE_STOPWORDS.has(key)) continue;
+    if (!isTextAllowedInUniverse(signal, universeKey)) continue;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    output.push(signal);
+    if (output.length >= limit) break;
+  }
+
+  return output;
+}
+
+function collectVoiceVocabulary(seeds: AuthorVoiceSeed[], universeKey: EmotionalUniverseKey): string[] {
+  return uniqueSignals(
+    seeds.flatMap((seed) => seed.vocabulary),
+    universeKey,
+    18,
+  );
+}
+
+function collectVoiceThemes(seeds: AuthorVoiceSeed[], universeKey: EmotionalUniverseKey): string[] {
+  const themes = uniqueSignals(
+    seeds.flatMap((seed) => [
+      ...seed.themes,
+      ...seed.emotions,
+      ...seed.archetypes,
+    ]),
+    universeKey,
+    12,
+  );
+  return themes.length ? themes : EMOTIONAL_UNIVERSES[universeKey].allowed.slice(0, 8);
+}
+
+function collectVoiceMetaphors(seeds: AuthorVoiceSeed[], universeKey: EmotionalUniverseKey): string[] {
+  const rawTerms = uniqueSignals(
+    seeds.flatMap((seed) => [
+      ...seed.vocabulary,
+      ...seed.themes,
+      ...seed.archetypes,
+    ]),
+    universeKey,
+    80,
+  );
+  const metaphors = rawTerms.filter((term) => {
+    const normalized = normalizeUniverseText(term);
+    return AUTHOR_VOICE_METAPHOR_TERMS.some((image) => normalized.includes(image));
+  });
+  const fallback = EMOTIONAL_UNIVERSES[universeKey].allowed.filter((term) =>
+    isTextAllowedInUniverse(term, universeKey),
+  );
+  return (metaphors.length ? metaphors : fallback).slice(0, 8);
+}
+
+function filterSeedsForUniverse(
+  seeds: AuthorVoiceSeed[],
+  universeKey: EmotionalUniverseKey,
+): AuthorVoiceSeed[] {
+  return seeds.filter((seed) => {
+    const metadataSignals = safeSeedPieces(
+      [
+        ...seed.themes,
+        ...seed.emotions,
+        ...seed.recipients,
+        ...seed.archetypes,
+        ...seed.vocabulary,
+        seed.tone,
+        seed.narrativePattern,
+        ...seed.styleRules,
+      ],
+      universeKey,
+    );
+    return metadataSignals.length >= 2;
+  });
+}
+
+function buildUniverseFallbackContext(universeKey: EmotionalUniverseKey): string {
+  const universe = EMOTIONAL_UNIVERSES[universeKey];
+  return [
+    `Fonte autoral filtrada: guia seguro do universo ${universe.label}.`,
+    `Campo semântico permitido: ${universe.allowed.join(", ")}.`,
+    "Use linguagem humana, específica, em primeira pessoa e sem copiar frases prontas.",
+  ].join("\n");
+}
+
+function buildAuthorVoiceProfile(
+  seeds: AuthorVoiceSeed[],
+  universeKey: EmotionalUniverseKey,
+): AuthorVoiceProfile {
+  const sourceBooks = [...new Set(seeds.map((seed) => seed.sourceBook))]
+    .filter(Boolean)
+    .slice(0, 6);
+  const sourceFiles = [...new Set(seeds.map((seed) => seed.sourceFile))]
+    .filter(Boolean)
+    .slice(0, 6);
+
+  return {
+    sourceBooks,
+    sourceFiles,
+    seedCount: seeds.length,
+    themes: collectVoiceThemes(seeds, universeKey),
+    vocabulary: collectVoiceVocabulary(seeds, universeKey),
+    metaphors: collectVoiceMetaphors(seeds, universeKey),
+    rhythm: DEFAULT_AUTHOR_RHYTHM,
+  };
+}
+
+function buildAuthorVoiceProfileContext(
+  seeds: AuthorVoiceSeed[],
+  universeKey: EmotionalUniverseKey,
+): string {
+  if (seeds.length === 0) return buildUniverseFallbackContext(universeKey);
+
+  const profile = buildAuthorVoiceProfile(seeds, universeKey);
+  return [
+    "Perfil autoral Jefferson (sinais agregados, sem frases literais):",
+    `Livros usados apenas como amostra de voz: ${profile.sourceBooks.join(", ") || "base autoral local"}.`,
+    `Arquivos de origem: ${profile.sourceFiles.join(", ") || "fontes autorais agregadas"}.`,
+    `Escopo: ${profile.seedCount} sinais compativeis nesta geracao, de ${AUTHOR_VOICE_STATS.totalSeeds} sinais mapeados.`,
+    `Temas compativeis extraidos: ${profile.themes.join(", ")}.`,
+    `Palavras recorrentes seguras: ${profile.vocabulary.join(", ") || EMOTIONAL_UNIVERSES[universeKey].allowed.join(", ")}.`,
+    `Metaforas/imagens recorrentes permitidas: ${profile.metaphors.join(", ")}.`,
+    `Ritmo e estilo: ${profile.rhythm.join("; ")}.`,
+    "Regra de aplicacao: primeiro obedeca ao universo emocional ativo; depois aplique esta voz apenas em estilo, ritmo, profundidade, vocabulario e metaforas.",
+    "Proibido copiar, reescrever ou parafrasear reflexoes, frases de impacto ou trechos dos livros.",
+  ].join("\n");
 }
 
 function selectAuthorSeeds(data: GenRequest): AuthorVoiceSeed[] {
@@ -559,7 +828,7 @@ function adaptDetailToNaturalNarrative(detail: string, context: 'memory' | 'apol
     return "qualquer atitude minha que tenha feito você pensar que eu não te amo";
   }
   if (context === 'apology' && /(você pode pensar|acha que|duvida)/i.test(lower)) {
-    return `qualquer situação que tenha feito você pensar: "${trimmed}"`;
+    return `qualquer situação que tenha feito você pensar que ${trimmed.toLowerCase().replace(/^que\s+/i, '')}`;
   }
 
   // 2. Declaração/Gratidão iniciando com "obrigado" ou "agradeço"
@@ -568,20 +837,16 @@ function adaptDetailToNaturalNarrative(detail: string, context: 'memory' | 'apol
     return `ter ${cleaned}`; 
   }
 
-  // 3. Declaração direta ("você é...", "te amo")
-  if (/^você é|^te amo|^amo muito/i.test(trimmed)) {
-    return `que ${trimmed}`;
+  // 3. Declaração direta e frases de amor/permanência
+  if (/^você é|^te amo|^amo muito|vou te amar|pra sempre|tudo pra mim|meu tudo/i.test(lower)) {
+    return trimmed; // O template adicionará "que " ou "por " de forma fluida
   }
 
   // 4. Conselho imperativo curto
-  if (/não desista/i.test(lower)) {
-    return "de não desistir";
-  }
-  if (/acredite em você/i.test(lower)) {
-    return "de acreditar em si mesma";
-  }
+  if (/não desista/i.test(lower)) return "de não desistir";
+  if (/acredite em você/i.test(lower)) return "de acreditar em si";
   if (/continue|força|lute|supere|não desanime|siga em frente|confie|nunca desista/i.test(lower)) {
-    return `de que "${trimmed}"`;
+    return `de que ${trimmed}`;
   }
 
   // 5. Memória concreta (mantém fluido)
@@ -589,74 +854,30 @@ function adaptDetailToNaturalNarrative(detail: string, context: 'memory' | 'apol
     return trimmed; 
   }
 
-  // 6. Fallback seguro: isola com aspas
-  return `"${trimmed}"`;
+  // 6. Fallback seguro: transforma em oração subordinada suave, SEM aspas literais
+  return `que ${trimmed}`;
 }
 
-function buildSeedSentence(
-  seed: AuthorVoiceSeed | undefined,
+function splitFallbackSentences(data: GenRequest): string[] {
+  return buildEmotionalUniverseFallback(data)
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function pickSafeFallbackSentence(
   data: GenRequest,
   rng: () => number,
-  style: VariationStyle,
-  index: number,
+  universeKey: EmotionalUniverseKey,
 ): string {
-  if (!seed) return pick(bridgeSentences, rng);
-
-  // REGRA DE OURO: Adaptar sintaticamente o detalhe para evitar quebra gramatical e fundi-lo à narrativa.
-  if (data.sharedMemory) {
-    const memoryType = classifySharedMemory(data.sharedMemory);
-    const adapted = adaptDetailToNaturalNarrative(data.sharedMemory, memoryType);
-    
-    if (memoryType === "advice") {
-      const adviceVariants = [
-        `Quero lembrar você ${adapted}.`,
-        `Levo sempre comigo ${adapted}.`,
-        `Espero que você nunca esqueça ${adapted}.`,
-      ];
-      return pick(adviceVariants, rng);
-    }
-    
-    if (memoryType === "declaration") {
-      const declarationVariants = [
-        `Sou grato por ${adapted}.`,
-        `Quero que esta mensagem seja um eco do que sinto: ${adapted}.`,
-        `Deixo aqui registrado o que meu coração diz: ${adapted}.`,
-      ];
-      return pick(declarationVariants, rng);
-    }
-    
-    if (memoryType === "memory") {
-      const factVariants = [
-        `Lembro-me concretamente de ${adapted}, e é por isso que nosso laço é tão valioso.`,
-        `Quando penso em ${adapted}, percebo o quanto isso marcou a minha vida e a nossa relação.`,
-        `Nunca vou esquecer de ${adapted}. Foi ali que eu entendi o tamanho do seu cuidado.`,
-      ];
-      return pick(factVariants, rng);
-    }
-
-    // Fallback para "other"
-    const otherVariants = [
-      `Quero que esta mensagem leve até você este sentimento: "${data.sharedMemory.trim()}".`,
-      `Deixo esta verdade registrada no meu coração: "${data.sharedMemory.trim()}".`,
-      `Este pensamento guia o que sinto por você: "${data.sharedMemory.trim()}".`,
-    ];
-    return pick(otherVariants, rng);
-  }
-
-  // CORREÇÃO DEFINITIVA: Removido o uso de seed.impact e seed.reflection para evitar injeção de frases prontas dos livros.
-  // O fallback agora usa apenas estruturas neutras que forçam o foco na relação e no destinatário, sem conclusões poéticas prontas.
-  const variants = [
-    `Esse momento me faz valorizar ainda mais o que temos, e isso ganha um significado especial entre nós.`,
-    `Entre o cuidado e o que sentimos, eu escolho valorizar cada instante ao seu lado.`,
-    `Fica uma certeza serena: é com essa delicadeza que quero honrar nosso laço e reafirmar o que sinto por você.`,
-    `O que sinto é genuíno; por isso busco chegar até você com respeito e verdade todos os dias.`,
-    `Nossa conexão se mostra no dia a dia, através de gestos simples e de um apoio real que não precisa de grandes discursos.`,
-  ];
-
-  return variants[index % variants.length];
+  const safeSentences = splitFallbackSentences(data).filter((sentence) =>
+    isTextAllowedInUniverse(sentence, universeKey),
+  );
+  return pick(safeSentences.length ? safeSentences : splitFallbackSentences(data), rng);
 }
 
 function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: () => number): string {
+  const universe = resolveEmotionalUniverse(data);
   const shouldUseFfp = /fé|motivacional|reflexão|perdão/.test(data.tone) || /f[eé]|luta|cansa|recome/i.test(data.intention);
   
   // CORREÇÃO DEFINITIVA: Removidas conclusões poéticas prontas ("amor mostrando em silêncio").
@@ -672,54 +893,40 @@ function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: 
       : "Que o coração encontre descanso e renovação, sabendo que há alguém torcendo por você.",
   ];
 
-  return pick(variants, rng);
+  const safeVariants = variants.filter((sentence) =>
+    isTextAllowedInUniverse(sentence, universe.key),
+  );
+  return safeVariants.length
+    ? pick(safeVariants, rng)
+    : pickSafeFallbackSentence(data, rng, universe.key);
 }
 
-function buildGoldenFallbackSentence(data: GenRequest, rng: () => number): string {
-  const golden = GOLDEN_SEEDS[Math.floor(rng() * GOLDEN_SEEDS.length)]!;
-  const variants = [
-    golden.reflection,
-    golden.impact,
-    `A ${golden.theme.split(" ")[0].toLowerCase()} não é sobre perfeição, é sobre ${golden.vocabulary.slice(0, 2).join(" e ")}.`,
-  ];
-  return pick(variants, rng);
+function buildPremiumUniverseFallback(data: GenRequest): string {
+  const name = data.name || "você";
+  const universe = resolveEmotionalUniverse(data);
+  const messages: Record<EmotionalUniverseKey, string> = {
+    amor: `${name}, o que sinto por você continua com carinho, afeto e presença. A saudade aproxima meu pensamento dos seus detalhes, do seu sorriso e desse desejo respeitoso de estar perto sem pressa, com admiração e cuidado. Eu escolho esse romance nas pequenas atitudes, no companheirismo que acolhe e na vontade bonita de fazer você se sentir especial de um jeito leve, inteiro e verdadeiro.`,
+    fe: `${name}, sigo confiando em Deus e levando em oração aquilo que ainda precisa amadurecer. A esperança não precisa fazer barulho para renovar o propósito, porque a confiança também se constrói nos dias simples. Que sua espiritualidade encontre descanso, direção e serenidade para atravessar este momento com fé firme, coração atento e paz suficiente para continuar.`,
+    amizade: `${name}, sua amizade tem valor de apoio real, parceria e presença. Eu reconheço a lealdade que existe entre nós e o companheirismo que aparece nos dias bons e também nos difíceis. Quero que você saiba que pode contar comigo, porque vínculo verdadeiro se mostra no cuidado constante, na escuta sincera e na vontade de permanecer por perto.`,
+    pedido_desculpas: `${name}, eu reconheço meu erro e assumo a responsabilidade pelo que aconteceu. Sinto arrependimento sincero, peço perdão sem tentar diminuir o que você sentiu e quero reparar com atitudes melhores. Sei que a reconstrução exige tempo, respeito e coerência, por isso desejo provar, com cuidado e verdade, que aprendi com essa falha.`,
+    gratidao: `${name}, guardo gratidão pelo que você representa e pelo cuidado que marcou minha vida. Cada lembrança me traz reconhecimento da sua importância, dos gestos que talvez pareçam simples, mas ficaram comigo de um jeito profundo. Obrigado por ser presença, por somar nos detalhes e por deixar em mim motivos reais para valorizar nossa história.`,
+    reflexao: `${name}, este momento pede aprendizado, maturidade e tempo. Nem todo crescimento acontece de uma vez; algumas mudanças chegam aos poucos, quando a vida nos ensina a olhar com mais calma para escolhas, limites e caminhos. Quero acolher essa fase com consciência, sem pressa de parecer pronto, mas com coragem para amadurecer de verdade.`,
+    motivacao: `${name}, continue com coragem, mesmo que o recomeço pareça pequeno no início. A força nem sempre aparece como grande vitória; às vezes ela mora no passo dado com perseverança quando ninguém está vendo. Respire, organize o coração e siga, porque cada atitude firme aproxima você de uma versão mais inteira, mais confiante e mais preparada.`,
+    aniversario: `${name}, hoje é dia de celebração, alegria e vida. Que este novo ciclo chegue com bênçãos, boas lembranças e motivos sinceros para sorrir. Desejo que você receba carinho, abraços verdadeiros e a certeza de que sua presença importa. Que cada novo dia traga leveza, saúde, afeto e momentos bonitos para guardar com felicidade.`,
+  };
+
+  return messages[universe.key];
 }
 
-function buildFallback(request: GenRequest, seeds: AuthorVoiceSeed[]): string {
+function buildFallback(request: GenRequest, _seeds: AuthorVoiceSeed[]): string {
   const data = prepareRequest(request);
-  const selected = seeds.length > 0 ? seeds : selectAuthorSeeds(data);
-  const rng = createRng(`${data.generationId}-fallback`);
-  const retryRng = createRng(`${data.generationId}-fallback-retry`);
-  const style = styleForGeneration(data.generationId || createGenerationId());
-  
-  const sentences = [
-    buildOpening(data, rng, style),
-    selected[0] ? buildSeedSentence(selected[0], data, rng, style, Math.floor(rng() * 6)) : buildGoldenFallbackSentence(data, rng),
-    selected[1] ? buildSeedSentence(selected[1], data, rng, style, Math.floor(rng() * 6) + 1) : buildGoldenFallbackSentence(data, rng),
-    pick(bridgeSentences, rng),
-    buildClosing(selected[2], data, rng),
-  ];
-
-  const count = data.length === "curta" ? 2 : data.length === "média" ? 4 : 5;
-  const middle = shuffle(sentences.slice(1, -1), rng);
-  const selectedSentences =
-    count === 2
-      ? [sentences[0]!, middle[0] || sentences[1]!]
-      : [sentences[0]!, ...middle.slice(0, count - 2), sentences[sentences.length - 1]!];
-  const text = cleanGeneratedText(selectedSentences.join(" "));
-
-  return containsGenericPhrase(text) || isTooSimilarToPrevious(text, data.previousMessages)
-    ? cleanGeneratedText(
-        [
-          buildOpening(data, retryRng, style),
-          pick(styleSentences[style], retryRng),
-          selected[3] ? buildSeedSentence(selected[3], data, retryRng, style, Math.floor(retryRng() * 6) + 2) : buildGoldenFallbackSentence(data, retryRng),
-          buildClosing(selected[4], data, retryRng),
-        ]
-          .slice(0, count)
-          .join(" "),
-      )
-    : text;
+  const fallback = cleanGeneratedText(
+    data.messageStart || data.premiumMessage
+      ? buildPremiumUniverseFallback(data)
+      : buildEmotionalUniverseFallback(data),
+  );
+  const validation = validateEmotionalUniverseText(fallback, data);
+  return validation.ok ? fallback : cleanGeneratedText(buildEmotionalUniverseFallback({ ...data, sharedMemory: "" }));
 }
 
 function buildApologyFallback(data: GenRequest): string {
@@ -737,7 +944,7 @@ function buildApologyFallback(data: GenRequest): string {
     sentences.push(`Peço desculpas de coração e espero que, com o tempo, possamos reconstruir o que foi abalado.`);
   }
   
-  const count = data.length === "curta" ? 2 : data.length === "média" ? 3 : 4;
+  const count = data.length === "longa" ? 4 : 3;
   return cleanGeneratedText(sentences.slice(0, count).join(" "));
 }
 
@@ -749,12 +956,13 @@ export async function generateBookBasedMessage(
     ...prepared,
     previousMessages: mergePreviousMessages(prepared),
   };
-  const category = inferCategory(data.intention, data.tone);
-  
-  const seeds = selectAuthorSeeds(data);
-  const authorContext = buildAuthorVoiceContext(seeds);
+  const inferredCategory = inferCategory(data.intention, data.tone);
+  const universe = resolveEmotionalUniverse(data);
+  const rawSeeds = selectAuthorSeeds(data);
+  const seeds = filterSeedsForUniverse(rawSeeds, universe.key);
+  const authorContext = buildAuthorVoiceProfileContext(seeds, universe.key);
   const generationId = data.generationId || createGenerationId();
-  const style = styleForGeneration(generationId);
+  const style = styleForUniverse(generationId, universe.key);
   const previousMessages = (data.previousMessages || [])
     .map((message, index) => `${index + 1}. ${message}`)
     .join("\n");
@@ -764,82 +972,130 @@ export async function generateBookBasedMessage(
 
   // LOGS DE AUDITORIA AUTORAL
   console.log("[AUTHOR_BASE]");
-  console.log("query:", { intention: data.intention, tone: data.tone, recipient: data.relationship });
-  console.log("livros encontrados:", [...new Set(seeds.map(s => s.sourceBook))].join(", "));
-  console.log("trechos selecionados:", seeds.slice(0, 2).map(s => s.impact).join(" | "));
-  console.log("temas selecionados:", seeds.slice(0, 2).map(s => s.themes.join(", ")).join(" | "));
-  console.log("motivo da seleção:", "Score de relevância por intenção, tom e relacionamento");
+  console.log("query:", {
+    intention: data.intention,
+    tone: data.tone,
+    recipient: data.relationship,
+    universe: universe.label,
+    inferredCategory,
+  });
+  console.log("livros encontrados:", [...new Set(seeds.map((s) => s.sourceBook))].join(", "));
+  console.log("seeds brutas:", rawSeeds.length, "seeds seguras:", seeds.length);
+  console.log("perfil de voz autoral:", buildAuthorVoiceProfile(seeds, universe.key));
+  console.log("motivo da seleção:", "Universo emocional primeiro; voz autoral aplicada apenas como estilo");
   
   console.log("[FINAL_PROMPT]");
-  console.log("resumo:", `Dados: ${data.name} (${data.relationship}), Ocasião: ${data.occasion}. Base autoral: ${seeds.length} seeds de ${[...new Set(seeds.map(s => s.sourceBook))].join(", ")}.`);
+  console.log("resumo:", `Dados: ${data.name} (${data.relationship}), Universo: ${universe.label}. Base autoral filtrada: ${seeds.length} seeds.`);
 
-  const prompt = `
-Você é o escritor do Alma Escrita, inspirado na voz autoral de Jefferson Rodrigues da Silva. Use os trechos e ensinamentos abaixo como inspiração emocional e espiritual, mas escreva uma mensagem nova, humana, específica e natural para a pessoa informada.
+  const occasionForPrompt =
+    universe.key === "reflexao"
+      ? "Reflexão"
+      : universe.key === "fe"
+        ? "Fé"
+        : universe.key === "motivacao"
+          ? "Motivação"
+          : universe.key === "gratidao"
+            ? "Gratidão"
+            : universe.key === "pedido_desculpas"
+              ? "Pedido de desculpas"
+              : universe.key === "aniversario"
+                ? "Aniversário"
+                : universe.key === "amizade"
+                  ? "Amizade"
+                  : data.occasion || "Declaração de amor";
+  const targetLengthGuidance =
+    data.messageStart || data.premiumMessage
+      ? "100 a 120 palavras"
+      : lengthGuidance[data.length];
+
+  const buildPrompt = (retryInstruction = "") => `
+Você é o escritor do Alma Escrita, inspirado na voz autoral de Jefferson Rodrigues da Silva. Primeiro obedeça ao universo emocional ativo. Depois aplique a voz Jefferson apenas como estilo, ritmo, profundidade, vocabulário e metáforas seguras. Nunca use os livros como base de frases.
 
 DADOS DO PEDIDO:
 - Quem envia: ${data.senderName || "Alguém que te quer bem"}
 - Quem recebe: ${data.name || data.recipient}
 - Relação: ${data.relationship || data.recipient}
-- Ocasião: ${data.occasion || data.intention}
+- Tipo emocional dominante: ${universe.label}
+- Ocasião interpretada: ${occasionForPrompt}
 - Detalhe/Memória especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
+- Início escrito pelo usuário: ${data.messageStart || "Não informado."}
+- Mensagem Premium: ${data.premiumMessage ? "sim" : "não"}
 - Tom escolhido: ${data.tone}
-- Tamanho escolhido: ${data.length} (${lengthGuidance[data.length]})
+- Tamanho escolhido: ${data.length} (${targetLengthGuidance})
+- Variação autoral segura: ${style}
 
-CONTEXTO AUTORAL (INSPIRAÇÃO, NÃO PARA COPIAR):
+PERFIL DE VOZ AUTORAL (SINAIS AGREGADOS, NÃO CONTEÚDO TEMÁTICO):
 ${authorContext}
 
 REGRAS ABSOLUTAS DE ESCRITA:
-1. ESCREVA DO ZERO: Não use templates, fórmulas ou estruturas fixas. Cada mensagem deve ser única e fluida.
-2. NÃO COPIE TRECHOS: Use os temas, vocabulário e ensinamentos acima apenas como inspiração. Nunca cole frases de impacto ou reflexão literalmente.
-3. INTERPRETAÇÃO DO DETALHE (REGRA CRÍTICA): Se o usuário informar uma frase completa ou ideia (ex: "você foi e será minha melhor escolha"), é ESTRITAMENTE PROIBIDO repetir a frase literalmente, usar aspas ou copiar e colar o detalhe no corpo da mensagem. Você DEVE INTERPRETAR a ideia e desenvolvê-la em uma narrativa emocional única (ex: "Entre todas as escolhas que a vida me permitiu fazer, você continua sendo aquela que mais alegra o meu coração").
-4. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
-5. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade. É ESTRITAMENTE PROIBIDO transformar um pedido de desculpas em declaração de amor romântico ou mensagem genérica de carinho.
-6. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use a linguagem poética, profunda e acolhedora dos livros, adaptada à relação (ex: pai para filho = proteção e legado; esposa = intimidade e presença).
-7. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "oração", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
-8. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
+1. GRAMÁTICA NATURAL DO PORTUGUÊS: Escreva com fluidez e correção gramatical impecável. Evite construções artificiais, repetições de preposições (ex: use "nesse" em vez de "em esse") e frases truncadas. O texto deve soar como uma pessoa real e culta escrevendo com o coração.
+2. UNIVERSO EMOCIONAL ESTRITO:
+${buildUniversePromptBlock(universe)}
+3. VOZ AUTORAL SEM CONTAMINAÇÃO: O perfil autoral acima não define tema. Ele só pode influenciar estilo, ritmo, profundidade, vocabulário e metáforas. A categoria escolhida pelo usuário sempre vence.
+4. NÃO COPIAR LIVROS: É proibido copiar, reescrever ou parafrasear reflexões, frases de impacto, trechos literais ou ensinamentos dos livros. Gere uma mensagem inédita.
+5. COMPLETAR MINHA MENSAGEM: Se "Início escrito pelo usuário" estiver informado, continue a intenção emocional desse início em aproximadamente 100 palavras. Não repita literalmente o início, não use aspas e não faça referência ao ato de completar.
+6. MENSAGEM PREMIUM: Se "Mensagem Premium" for "sim", escreva um texto mais profundo, com aproximadamente 100 a 120 palavras, mantendo o mesmo universo emocional escolhido.
+7. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: O campo "Detalhe/Memória especial" é APENAS CONTEXTO. É ESTRITAMENTE PROIBIDO copiar, colar ou parafrasear literalmente este texto. Você deve INTERPRETAR o significado emocional por trás dele e escrever uma frase original.
+8. PRIORIDADE ABSOLUTA DO DETALHE ROMÂNTICO/ÍNTIMO: Se o detalhe fornecido pelo usuário contiver elementos de desejo romântico, saudade física, beijo, abraço ou carinho íntimo, a mensagem DEVE obrigatoriamente seguir esse tom romântico, delicado e íntimo. É ESTRITAMENTE PROIBIDO ignorar esse detalhe ou substituí-lo por temas espirituais genéricos.
+9. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
+10. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade.
+11. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use linguagem poética, profunda e acolhedora somente quando isso couber no universo emocional ativo.
+12. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
+13. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
 
 Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas:
 ${previousMessages || "- nenhuma nesta sessão"}
 
 Frases e clichês proibidos (bloqueio rigoroso):
 ${blockedPhrases}
+
+${retryInstruction ? `REGERAÇÃO OBRIGATÓRIA:\n${retryInstruction}` : ""}
 `.trim();
 
   try {
-    const aiText = cleanGeneratedText(await generateAIMsg(prompt));
-    
-    // VALIDAÇÃO DE NEGÓCIO: Pedido de Desculpas (mantida conforme solicitado)
-    const isApology = /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.occasion || "") || 
-                      /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.intention || "");
-    
-    let finalText = aiText;
+    let retryInstruction = "";
 
-    if (isApology) {
-      const lowerText = finalText.toLowerCase();
-      const requiredTerms = ["desculpa", "perdão", "errei", "erro", "arrependimento", "responsabilidade"];
-      const matchCount = requiredTerms.filter(term => lowerText.includes(term)).length;
-      
-      if (matchCount < 2) {
-        console.log("[VALIDACAO_OCASIAO]");
-        console.log("occasion:", data.occasion || data.intention);
-        console.log("texto_final:", finalText);
-        console.log("resultado: reprovado (usando fallback de segurança)");
-        finalText = buildApologyFallback(data);
-      } else {
-        console.log("[VALIDACAO_OCASIAO]");
-        console.log("occasion:", data.occasion || data.intention);
-        console.log("texto_final:", finalText);
-        console.log("resultado: aprovado");
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const aiText = cleanGeneratedText(await generateAIMsg(buildPrompt(retryInstruction), data));
+      const validation = validateEmotionalUniverseText(aiText, data);
+      const generic = containsGenericPhrase(aiText);
+      const similar = isTooSimilarToPrevious(aiText, data.previousMessages);
+      const repeatedStart = repeatsMessageStart(aiText, data.messageStart);
+      const approved = validation.ok && !generic && !similar && !repeatedStart;
+
+      console.log("[VALIDACAO_UNIVERSO]");
+      console.log("tentativa:", attempt);
+      console.log("universo:", validation.universe.label);
+      console.log("texto_final:", aiText);
+      console.log("termos_bloqueados:", validation.forbiddenTerms.join(", ") || "nenhum");
+      console.log("obrigatorios_ausentes:", validation.missingRequired.join(", ") || "nenhum");
+      console.log("generico:", generic);
+      console.log("similar:", similar);
+      console.log("repetiu_inicio:", repeatedStart);
+      console.log("resultado:", approved ? "aprovado" : "reprovado");
+
+      if (approved) {
+        return rememberGeneratedMessage(aiText);
       }
+
+      retryInstruction = repeatedStart
+        ? "A versão anterior repetiu literalmente o início escrito pelo usuário. Continue a intenção emocional sem copiar esse início."
+        : validation.ok
+        ? "A versão anterior foi rejeitada por conter clichê, repetição ou proximidade excessiva com mensagens recentes. Gere uma versão nova, específica e sem repetir a estrutura."
+        : buildValidationRetryInstruction(validation);
     }
 
-    return rememberGeneratedMessage(finalText);
+    console.log("[VALIDACAO_UNIVERSO]");
+    console.log("resultado: reprovado apos retry (usando fallback de segurança)");
+    return rememberGeneratedMessage(buildFallback(data, seeds));
   } catch (error) {
-    console.warn("IA indisponível, usando base autoral local (fallback):", error);
-    const isApology = /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.occasion || "") || 
-                      /pedido de desculpas|desculpa|perdão|erro|errei/i.test(data.intention || "");
-    if (isApology) {
-        return rememberGeneratedMessage(buildApologyFallback(data));
+    console.warn("IA indisponível, usando fallback seguro de universo emocional:", error);
+    if (universe.key === "pedido_desculpas") {
+      const fallback = buildApologyFallback(data);
+      const validation = validateEmotionalUniverseText(fallback, data);
+      return rememberGeneratedMessage(
+        validation.ok ? fallback : buildEmotionalUniverseFallback(data),
+      );
     }
     return rememberGeneratedMessage(buildFallback(data, seeds));
   }

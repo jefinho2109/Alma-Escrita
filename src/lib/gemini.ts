@@ -1,4 +1,9 @@
-export async function generateAIMsg(prompt: string): Promise<string> {
+import type { GenRequest } from "@/data/generator";
+
+export async function generateAIMsg(
+  prompt: string,
+  generationRequest?: GenRequest,
+): Promise<string> {
   const response = await fetch("/api/gemini-message", {
     method: "POST",
     cache: "no-store",
@@ -9,6 +14,7 @@ export async function generateAIMsg(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       prompt,
+      generationRequest,
       requestNonce:
         globalThis.crypto?.randomUUID?.() ||
         `${Date.now()}-${Math.random().toString(36).slice(2)}`,

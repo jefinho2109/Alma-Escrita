@@ -1,3 +1,8 @@
+import {
+  buildEmotionalUniverseFallback,
+  validateEmotionalUniverseText,
+} from "@/data/emotionalUniverses";
+
 export type GenRecipient =
   | "mim"
   | "amor"
@@ -61,6 +66,8 @@ export interface GenRequest {
   relationship?: GenRelationship;
   occasion?: GenOccasion;
   sharedMemory?: string;
+  messageStart?: string;
+  premiumMessage?: boolean;
   intention: string;
   tone: GenTone;
   length: GenLength;
@@ -134,7 +141,7 @@ const TONE_OPENINGS: Record<GenTone, string[]> = {
     "existem sentimentos que chegam mansos e ficam eternos",
   ],
   emocionante: [
-    "algumas verdades só cabem quando a alma fala sem pressa",
+    "algumas verdades só cabem quando o coração fala sem pressa",
     "tem palavras que nascem do lugar mais bonito do peito",
   ],
   fé: [
@@ -142,23 +149,23 @@ const TONE_OPENINGS: Record<GenTone, string[]> = {
     "a fé acende luz até nos dias em que o coração quase apaga",
   ],
   gratidão: [
-    "gratidão é quando a alma percebe que recebeu mais do que palavras explicam",
+    "gratidão é quando o coração reconhece que recebeu mais do que palavras explicam",
     "agradecer é guardar no coração aquilo que a vida fez florescer",
   ],
   perdão: [
     "perdoar não apaga a história, mas devolve ar ao coração",
-    "há curas que começam quando a alma decide não viver presa à dor",
+    "há curas que começam quando a pessoa decide não viver presa à dor",
   ],
   saudade: [
     "a saudade é presença que aprendeu a morar no silêncio",
-    "existem ausências que continuam tocando a alma com ternura",
+    "existem ausências que continuam tocando a memória com ternura",
   ],
   motivacional: [
-    "quem ainda respira esperança já começou a vencer por dentro",
-    "mesmo devagar, cada passo sincero aproxima a alma do recomeço",
+    "quem escolhe a coragem já começou a vencer por dentro",
+    "mesmo devagar, cada passo sincero aproxima você do recomeço",
   ],
   reflexão: [
-    "a vida ensina mais quando a alma aceita escutar com calma",
+    "a vida ensina mais quando a gente aceita escutar com calma",
     "há dias que não mudam tudo, mas revelam o que precisa florescer",
   ],
 };
@@ -187,6 +194,8 @@ export function normalizeGenRequest(request: GenRequest): GenRequest {
     relationship: request.relationship,
     occasion: request.occasion,
     sharedMemory: request.sharedMemory?.trim(),
+    messageStart: request.messageStart?.trim(),
+    premiumMessage: Boolean(request.premiumMessage),
     intention: request.intention.trim(),
     tone: GEN_TONES.includes(request.tone) ? request.tone : "emocionante",
     length: GEN_LENGTHS.includes(request.length) ? request.length : "média",
@@ -215,7 +224,7 @@ export function generateMessage(request: GenRequest): string {
       : data.tone === "romântica"
         ? "Eu queria que você soubesse o quanto sou grato por tudo o que você faz por mim e por tudo o que você desperta em mim."
         : data.tone === "gratidão"
-          ? "Eu agradeço, do fundo da alma, por cada gesto seu que me sustenta e me faz sentir cuidado."
+          ? "Eu agradeço, com reconhecimento sincero, por cada gesto seu que me sustenta e me faz sentir cuidado."
           : data.tone === "saudade"
             ? "Eu sinto a sua falta de um jeito que ainda mora em mim e insiste em pedir um pouco mais de presença."
             : data.tone === "fé"
@@ -228,15 +237,17 @@ export function generateMessage(request: GenRequest): string {
 
   const intentionSentence = data.intention
     ? `E o que eu quero dizer, com verdade, é isto: ${data.intention}.`
-    : "Escrevo como quem confessa o que a alma não consegue guardar em silêncio.";
+    : "Digo isso com a sinceridade de quem guarda esse sentimento no peito.";
 
   const sentences = [
     firstSentence,
     secondSentence,
     intentionSentence,
-    "Que estas palavras cheguem como abraço, presença e luz no ponto exato onde o coração precisa sentir.",
-    "E que fique o essencial: quando a alma fala com amor, até o silêncio entende.",
+    "Que este carinho chegue como abraço, presença e cuidado no ponto exato onde o coração precisa sentir.",
+    "E que fique o essencial: quando o afeto é verdadeiro, até o silêncio entende.",
   ];
 
-  return sentences.slice(0, LENGTH_SENTENCES[data.length]).join(" ");
+  const text = sentences.slice(0, LENGTH_SENTENCES[data.length]).join(" ");
+  const validation = validateEmotionalUniverseText(text, data);
+  return validation.ok ? text : buildEmotionalUniverseFallback(data);
 }

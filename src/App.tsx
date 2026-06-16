@@ -11,6 +11,7 @@ import {
 } from "@/data/messages";
 import { AuthModal, type MockUser } from "@/components/AuthModal";
 import { ProfileModal } from "@/components/ProfileModal";
+import PremiumModal from "@/components/PremiumModal";
 import ImageCreator from "@/components/ImageCreator";
 import MessageSpeaker from "@/components/MessageSpeaker";
 import {
@@ -26,6 +27,12 @@ import {
   type GenTone,
 } from "@/data/generator";
 import { generateBookBasedMessage } from "@/data/bookBasedGenerator";
+import {
+  PREMIUM_TEST_ENABLED,
+  buildPremiumSignature,
+  getPremiumUserName,
+  isPremiumUser,
+} from "@/lib/premium";
 
 const ALMA_SONORA_URL =
   "https://alma-sonora.vercel.app/";
@@ -34,7 +41,7 @@ const COPIED_KEY = "alma-escrita:last-copied";
 const FILTER_KEY = "alma-escrita:last-filter";
 const CUSTOM_FAVORITES_KEY = "alma-escrita:custom-favorites";
 const LAST_GENERATED_KEY = "alma-escrita:last-generated";
-const GEN_FORM_KEY = "alma-escrita:gen-form";
+const SIMPLE_GEN_FORM_KEY = "alma-escrita:simple-gen-form";
 const RECENT_KEY = "alma-escrita:recent";
 const RECENT_LIMIT = 5;
 const DAILY_KEY = "alma-escrita:daily";
@@ -56,9 +63,32 @@ interface GeneratedMessage {
   tone: GenTone;
   length: GenLength;
   text: string;
+  signature?: string;
+  messageStart?: string;
+  premiumMessage?: boolean;
   createdAt: number;
 }
 
+export type SimpleMessageType = 
+  | "Amor"
+  | "Gratidão"
+  | "Reflexão"
+  | "Motivação"
+  | "Pedido de Desculpas"
+  | "Aniversário"
+  | "Amizade"
+  | "Família";
+
+export interface SimpleGenForm {
+  recipientName: string;
+  messageType: SimpleMessageType;
+  importantDetail: string;
+  signMessage: boolean;
+  messageStart: string;
+  premiumMessage: boolean;
+}
+
+// Legacy interface kept for internal mapping compatibility
 interface GenForm {
   name: string;
   senderName: string;
@@ -87,6 +117,14 @@ type RecentItem =
       label: string;
       addedAt: number;
     };
+
+function getGeneratedSignature(message: GeneratedMessage | null): string {
+  return message?.signature?.trim() || SIGNATURE;
+}
+
+function formatWithSignature(text: string, signature: string): string {
+  return [text.trim(), signature.trim()].filter(Boolean).join("\n\n");
+}
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [state, setState] = useState<T>(() => {
@@ -172,6 +210,51 @@ function categoryEmoji(c: Category): string {
   }
 }
 
+function mapMessageTypeToRecipient(type: SimpleMessageType): GenRecipient {
+  switch (type) {
+    case "Amor": return "amor";
+    case "Família": return "família";
+    case "Amizade": return "amigo";
+    default: return "outro";
+  }
+}
+
+function mapMessageTypeToRelationship(type: SimpleMessageType): string {
+  switch (type) {
+    case "Amor": return "Namorado";
+    case "Família": return "Outro";
+    case "Amizade": return "Amigo";
+    case "Pedido de Desculpas": return "Outro";
+    default: return "Outro";
+  }
+}
+
+function mapMessageTypeToOccasion(type: SimpleMessageType): string {
+  switch (type) {
+    case "Amor": return "Declaração de amor";
+    case "Gratidão": return "Agradecimento";
+    case "Reflexão": return "Fé e superação";
+    case "Motivação": return "Motivação";
+    case "Pedido de Desculpas": return "Pedido de desculpas";
+    case "Aniversário": return "Aniversário";
+    case "Amizade": return "Homenagem";
+    case "Família": return "Homenagem";
+  }
+}
+
+function mapMessageTypeToTone(type: SimpleMessageType): GenTone {
+  switch (type) {
+    case "Amor": return "romântica";
+    case "Gratidão": return "gratidão";
+    case "Reflexão": return "reflexão";
+    case "Motivação": return "motivacional";
+    case "Pedido de Desculpas": return "perdão";
+    case "Aniversário": return "emocionante";
+    case "Amizade": return "emocionante";
+    case "Família": return "gratidão";
+  }
+}
+
 function App() {
   const [filter, setFilter] = useLocalStorageState<Filter>(FILTER_KEY, {
     kind: "none",
@@ -184,16 +267,13 @@ function App() {
     COPIED_KEY,
     null,
   );
-  const [genForm, setGenForm] = useLocalStorageState<GenForm>(GEN_FORM_KEY, {
-    name: "",
-    senderName: "",
-    relationship: "",
-    occasion: "",
-    sharedMemory: "",
-    intention: "",
-    recipient: "amor",
-    tone: "emocionante",
-    length: "média",
+  const [simpleForm, setSimpleForm] = useLocalStorageState<SimpleGenForm>(SIMPLE_GEN_FORM_KEY, {
+    recipientName: "",
+    messageType: "Amor",
+    importantDetail: "",
+    signMessage: false,
+    messageStart: "",
+    premiumMessage: false,
   });
   const [lastGenerated, setLastGenerated] =
     useLocalStorageState<GeneratedMessage | null>(LAST_GENERATED_KEY, null);
@@ -223,8 +303,11 @@ function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [mockUser, setMockUser] = useState<MockUser | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [premiumOpen, setPremiumOpen] = useState(false);
   const [generatingCustom, setGeneratingCustom] = useState(false);
   const generatedRef = useRef<HTMLDivElement | null>(null);
+  const premiumUser = isPremiumUser(mockUser);
+  const premiumDisplayName = premiumUser && mockUser ? getPremiumUserName(mockUser) : "";
 
   useEffect(() => {
     if (!toast) return;
@@ -433,8 +516,29 @@ function App() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  function openImageCreator(message: string) {
-    setImageCreatorText(`${message.trim()}\n\nAlma Escrita`);
+  function openImageCreator(_message: string, _signature = SIGNATURE) {
+    if (!premiumUser) {
+      openPremiumGate();
+      return;
+    }
+    setToast("Imagem para status e redes sociais será ativada em breve.");
+  }
+
+  function openPremiumGate() {
+    setPremiumOpen(true);
+  }
+
+  function activatePremiumPlaceholder() {
+    setPremiumOpen(false);
+    setToast("Pagamento será ativado em breve.");
+  }
+
+  function requirePremium(action: () => void) {
+    if (!premiumUser) {
+      openPremiumGate();
+      return;
+    }
+    action();
   }
 
   function toggleFavorite(id: string) {
@@ -450,20 +554,35 @@ function App() {
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
+    if (!simpleForm.recipientName.trim()) {
+      setToast("Por favor, informe para quem é a mensagem.");
+      return;
+    }
     
-    // A relação é a única fonte de verdade para o destinatário no pipeline
-    const targetRecipient = (genForm.relationship?.toLowerCase() || "outro") as GenRecipient;
-    
+    const premiumSignature =
+      premiumUser && simpleForm.signMessage && mockUser
+        ? buildPremiumSignature(mockUser)
+        : SIGNATURE;
+    const premiumMessageStart = premiumUser
+      ? simpleForm.messageStart.trim()
+      : "";
+    const premiumMessageEnabled = premiumUser && simpleForm.premiumMessage;
+
     const request = {
-      name: genForm.name,
-      senderName: genForm.senderName || undefined,
-      relationship: (genForm.relationship as GenRelationship) || undefined,
-      occasion: (genForm.occasion as GenOccasion) || undefined,
-      sharedMemory: genForm.sharedMemory || undefined,
-      intention: genForm.intention ?? "",
-      recipient: targetRecipient,
-      tone: genForm.tone ?? "emocionante",
-      length: genForm.length ?? "média",
+      name: simpleForm.recipientName.trim(),
+      senderName:
+        premiumUser && simpleForm.signMessage && mockUser
+          ? mockUser.name
+          : "Alma Escrita",
+      relationship: mapMessageTypeToRelationship(simpleForm.messageType) as GenRelationship,
+      occasion: mapMessageTypeToOccasion(simpleForm.messageType) as GenOccasion,
+      sharedMemory: simpleForm.importantDetail.trim() || undefined,
+      intention: simpleForm.importantDetail.trim() || "Uma mensagem especial",
+      messageStart: premiumMessageStart || undefined,
+      premiumMessage: premiumMessageEnabled,
+      recipient: mapMessageTypeToRecipient(simpleForm.messageType),
+      tone: mapMessageTypeToTone(simpleForm.messageType),
+      length: (premiumMessageStart || premiumMessageEnabled ? "longa" : "média") as GenLength,
     };
 
     setGeneratingCustom(true);
@@ -477,6 +596,9 @@ function App() {
         tone: request.tone,
         length: request.length,
         text,
+        signature: premiumSignature,
+        messageStart: premiumMessageStart || undefined,
+        premiumMessage: premiumMessageEnabled,
         createdAt: Date.now(),
       };
       setLastGenerated(generated);
@@ -512,6 +634,8 @@ function App() {
         recipient: lastGenerated.recipient,
         tone: lastGenerated.tone ?? "emocionante",
         length: lastGenerated.length ?? "média",
+        messageStart: premiumUser ? lastGenerated.messageStart : undefined,
+        premiumMessage: premiumUser ? lastGenerated.premiumMessage : undefined,
       };
       const text = await generateBookBasedMessage(request);
       const updated = { ...lastGenerated, ...request, text, createdAt: Date.now() };
@@ -1422,153 +1546,207 @@ function App() {
 
             <div className="px-5 sm:px-7 py-6">
               <p className="text-sm text-[hsl(var(--muted-foreground))] mb-5">
-                Conte um pouco sobre você — eu escrevo uma mensagem feita só
-                pra esse momento.
+                Preencha os campos abaixo e eu escrevo uma mensagem feita só
+                para esse momento.
               </p>
 
-              <form onSubmit={handleGenerate} className="grid gap-4">
+              {premiumUser && (
+                <div className="-mt-2 mb-5 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--primary)/0.08)] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--primary))]">
+                  <span aria-hidden>✨</span>
+                  Premium teste ativo
+                </div>
+              )}
+
+              <form onSubmit={handleGenerate} className="grid gap-5">
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Nome da pessoa
+                    PARA QUEM É A MENSAGEM?
                   </span>
                   <input
                     type="text"
-                    inputMode="text"
-                    autoComplete="off"
-                    placeholder="Ex.: GT"
-                    value={genForm.name}
+                    placeholder="Ex.: Jordan, Alessandra, Patricia, Dalva"
+                    value={simpleForm.recipientName}
                     onChange={(e) =>
-                      setGenForm({ ...genForm, name: e.target.value })
+                      setSimpleForm({ ...simpleForm, recipientName: e.target.value })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
-                  />
-                </label>
-
-                <div className="mt-2 p-4 rounded-xl bg-[hsl(var(--muted))] border border-[hsl(var(--border))] space-y-4">
-                  <h3 className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
-                    <span aria-hidden>✨</span>
-                    Detalhes para Personalização (Opcional)
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                        Seu nome
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="Ex.: Jefferson"
-                        value={genForm.senderName}
-                        onChange={(e) =>
-                          setGenForm({ ...genForm, senderName: e.target.value })
-                        }
-                        className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm"
-                      />
-                    </label>
-
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                        Sua relação com a pessoa
-                      </span>
-                      <select
-                        value={genForm.relationship}
-                        onChange={(e) =>
-                          setGenForm({ ...genForm, relationship: e.target.value })
-                        }
-                        className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm"
-                      >
-                        <option value="">Selecione...</option>
-                        {GEN_RELATIONSHIPS.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                      Motivo da mensagem
-                    </span>
-                    <select
-                      value={genForm.occasion}
-                      onChange={(e) =>
-                        setGenForm({ ...genForm, occasion: e.target.value })
-                      }
-                      className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm"
-                    >
-                      <option value="">Selecione...</option>
-                      {GEN_OCCASIONS.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                      Memória ou detalhe especial
-                    </span>
-                    <textarea
-                      rows={3}
-                      placeholder="Ex.: Sempre esteve ao meu lado nos momentos mais difíceis da minha vida."
-                      value={genForm.sharedMemory}
-                      onChange={(e) =>
-                        setGenForm({ ...genForm, sharedMemory: e.target.value })
-                      }
-                      className="px-3 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-sm resize-none"
-                    />
-                  </label>
-                </div>
-
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    O que você quer dizer?
-                  </span>
-                  <textarea
-                    rows={4}
-                    value={genForm.intention ?? ""}
-                    onChange={(e) =>
-                      setGenForm({
-                        ...genForm,
-                        intention: e.target.value,
-                      })
-                    }
-                    placeholder="Ex.: Quero agradecer por tudo, pedir perdão, declarar meu amor..."
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-base"
                   />
                 </label>
 
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    Como você está se sentindo?
+                    TIPO DA MENSAGEM
                   </span>
                   <select
-                    value={genForm.tone ?? "emocionante"}
+                    value={simpleForm.messageType}
                     onChange={(e) =>
-                      setGenForm({
-                        ...genForm,
-                        tone: e.target.value as GenTone,
-                      })
+                      setSimpleForm({ ...simpleForm, messageType: e.target.value as SimpleMessageType })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-base"
                   >
-                    {GEN_TONES.map((m) => (
-                      <option key={m} value={m}>
-                        {m.charAt(0).toUpperCase() + m.slice(1)}
-                      </option>
-                    ))}
+                    <option value="Amor">❤️ Amor</option>
+                    <option value="Gratidão">🙏 Gratidão</option>
+                    <option value="Reflexão">✨ Reflexão</option>
+                    <option value="Motivação">🌻 Motivação</option>
+                    <option value="Pedido de Desculpas">💔 Pedido de Desculpas</option>
+                    <option value="Aniversário">🎂 Aniversário</option>
+                    <option value="Amizade">🤝 Amizade</option>
+                    <option value="Família">👨‍👩‍👧 Família</option>
                   </select>
                 </label>
 
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    CONTE ALGO IMPORTANTE
+                  </span>
+                  <textarea
+                    rows={4}
+                    placeholder="Ex.: Ela esteve ao meu lado nos momentos mais difíceis.&#10;Você me disse que se sentiu abandonado quando não fui ao seu jogo.&#10;Quero agradecer por tudo o que fez por mim."
+                    value={simpleForm.importantDetail}
+                    onChange={(e) =>
+                      setSimpleForm({ ...simpleForm, importantDetail: e.target.value })
+                    }
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition resize-none text-base"
+                  />
+                </label>
+
+                <div
+                  role={!premiumUser ? "button" : undefined}
+                  tabIndex={!premiumUser ? 0 : undefined}
+                  onClick={() => {
+                    if (!premiumUser) openPremiumGate();
+                  }}
+                  onKeyDown={(e) => {
+                    if (premiumUser) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openPremiumGate();
+                    }
+                  }}
+                  className={`flex items-center gap-3 p-4 rounded-xl border transition ${
+                    premiumUser
+                      ? "bg-[hsl(var(--muted))] border-[hsl(var(--border))]"
+                      : "bg-[hsl(var(--muted)/0.65)] border-dashed border-[hsl(var(--border))] cursor-pointer"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    id="signMessage"
+                    checked={premiumUser && simpleForm.signMessage}
+                    disabled={!premiumUser}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) =>
+                      setSimpleForm({ ...simpleForm, signMessage: e.target.checked })
+                    }
+                    className="h-5 w-5 rounded border-[hsl(var(--border))] text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="signMessage" className="text-sm font-medium text-[hsl(var(--foreground))] cursor-pointer select-none">
+                      Assinar mensagem
+                    </label>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+                      {premiumUser && premiumDisplayName
+                        ? `Premium: Com carinho, ${premiumDisplayName}`
+                        : "Premium: assinatura personalizada com seu nome"}
+                    </p>
+                  </div>
+                  {!premiumUser && (
+                    <span className="text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] border border-[hsl(var(--border))]">
+                      Premium
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  role={!premiumUser ? "button" : undefined}
+                  tabIndex={!premiumUser ? 0 : undefined}
+                  onClick={() => {
+                    if (!premiumUser) openPremiumGate();
+                  }}
+                  onKeyDown={(e) => {
+                    if (premiumUser) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openPremiumGate();
+                    }
+                  }}
+                  className={`grid gap-3 p-4 rounded-xl border transition ${
+                    premiumUser
+                      ? "bg-[hsl(var(--card))] border-[hsl(var(--border))]"
+                      : "bg-[hsl(var(--muted)/0.65)] border-dashed border-[hsl(var(--border))] cursor-pointer"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[hsl(var(--foreground))]">
+                        Completar minha mensagem
+                      </p>
+                      <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+                        Escreva o início da sua mensagem
+                      </p>
+                    </div>
+                    {!premiumUser && (
+                      <span className="text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] border border-[hsl(var(--border))]">
+                        Bloqueado
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    rows={3}
+                    disabled={!premiumUser}
+                    value={simpleForm.messageStart}
+                    onChange={(e) =>
+                      setSimpleForm({ ...simpleForm, messageStart: e.target.value })
+                    }
+                    placeholder="Ex.: Boa noite, mulher linda. Passei para deixar um carinho..."
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition resize-none text-base disabled:opacity-60"
+                  />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      requirePremium(() =>
+                        setSimpleForm({
+                          ...simpleForm,
+                          premiumMessage: !simpleForm.premiumMessage,
+                        }),
+                      )
+                    }
+                    className={`text-left p-4 rounded-xl border transition ${
+                      premiumUser && simpleForm.premiumMessage
+                        ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)]"
+                        : "border-[hsl(var(--border))] bg-[hsl(var(--card))]"
+                    } ${!premiumUser ? "border-dashed bg-[hsl(var(--muted)/0.65)]" : ""}`}
+                  >
+                    <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
+                      Mensagem Premium
+                    </span>
+                    <span className="block text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                      Texto mais profundo, com aproximadamente 100 a 120 palavras.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openPremiumGate}
+                    className="text-left p-4 rounded-xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.65)] transition"
+                  >
+                    <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
+                      Imagem para status e redes sociais
+                    </span>
+                    <span className="block text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                      Recurso Premium preparado para uma próxima etapa.
+                    </span>
+                  </button>
+                </div>
+
                 <button
                   type="submit"
-                  className="btn-grad mt-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium"
+                  className="btn-grad mt-2 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-semibold text-base"
                 >
-                  <span aria-hidden>✦</span>
-                  Gerar mensagem
+                  <span aria-hidden>✨</span>
+                  GERAR MENSAGEM
                 </button>
               </form>
 
@@ -1585,15 +1763,20 @@ function App() {
                   <p className="font-serif text-lg sm:text-xl leading-relaxed text-[hsl(var(--foreground))] text-balance">
                     “{lastGenerated.text}”
                   </p>
-                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
-                    {SIGNATURE}
+                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4 whitespace-pre-line">
+                    {getGeneratedSignature(lastGenerated)}
                   </p>
 
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
                       onClick={() =>
-                        copyText(`${lastGenerated.text}\n\n${SIGNATURE}`)
+                        copyText(
+                          formatWithSignature(
+                            lastGenerated.text,
+                            getGeneratedSignature(lastGenerated),
+                          ),
+                        )
                       }
                       className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                     >
@@ -1603,7 +1786,12 @@ function App() {
                     <button
                       type="button"
                       onClick={() =>
-                        shareText(`${lastGenerated.text}\n\n${SHARE_SIGNATURE}`)
+                        shareText(
+                          formatWithSignature(
+                            lastGenerated.text,
+                            getGeneratedSignature(lastGenerated),
+                          ),
+                        )
                       }
                       className="btn-grad inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
                     >
@@ -1612,7 +1800,12 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => openImageCreator(lastGenerated.text)}
+                      onClick={() =>
+                        openImageCreator(
+                          lastGenerated.text,
+                          getGeneratedSignature(lastGenerated),
+                        )
+                      }
                       className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                     >
                       <span aria-hidden>▣</span>
@@ -1672,7 +1865,9 @@ function App() {
                             <button
                               type="button"
                               onClick={() =>
-                                copyText(`${g.text}\n\n${SIGNATURE}`)
+                                copyText(
+                                  formatWithSignature(g.text, getGeneratedSignature(g)),
+                                )
                               }
                               className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
                             >
@@ -1681,7 +1876,9 @@ function App() {
                             <button
                               type="button"
                               onClick={() =>
-                                shareText(`${g.text}\n\n${SHARE_SIGNATURE}`)
+                                shareText(
+                                  formatWithSignature(g.text, getGeneratedSignature(g)),
+                                )
                               }
                               className="btn-grad text-xs font-medium px-3 py-1.5 rounded-full"
                             >
@@ -1689,7 +1886,7 @@ function App() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => openImageCreator(g.text)}
+                              onClick={() => openImageCreator(g.text, getGeneratedSignature(g))}
                               className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
                             >
                               Gerar imagem
@@ -1814,6 +2011,14 @@ function App() {
         open={authOpen}
         onClose={() => setAuthOpen(false)}
         onLogin={(user) => setMockUser(user)}
+      />
+
+      <PremiumModal
+        open={premiumOpen}
+        testMode={PREMIUM_TEST_ENABLED}
+        isLoggedIn={Boolean(mockUser)}
+        onClose={() => setPremiumOpen(false)}
+        onActivate={activatePremiumPlaceholder}
       />
 
       {/* Profile Modal */}
