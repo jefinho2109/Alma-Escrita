@@ -9,6 +9,7 @@ import {
 import {
   EMOTIONAL_UNIVERSES,
   buildEmotionalUniverseFallback,
+  buildPremiumEmotionalUniverseFallback,
   buildUniversePromptBlock,
   buildValidationRetryInstruction,
   isTextAllowedInUniverse,
@@ -35,10 +36,13 @@ const toneToCategory: Record<GenTone, string> = {
 };
 
 const lengthGuidance: Record<GenRequest["length"], string> = {
-  curta: "45 a 70 palavras",
-  média: "80 a 120 palavras",
-  longa: "130 a 180 palavras",
+  curta: "40 a 55 palavras",
+  média: "40 a 70 palavras",
+  longa: "80 a 100 palavras",
 };
+
+const PREMIUM_MIN_WORDS = 100;
+const PREMIUM_MAX_WORDS = 120;
 
 const BLOCKED_PHRASES = [
   ...GENERIC_PHRASE_BLOCKLIST,
@@ -287,6 +291,128 @@ function cleanGeneratedText(text: string): string {
     .replace(/^["“”]+|["“”]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function stripGeneratedSignature(text: string): string {
+  return cleanGeneratedText(text)
+    .replace(/\s*(?:\n|\s){0,2}Alma Escrita\s*$/i, "")
+    .replace(/\s*(?:\n|\s){0,2}Com carinho,\s*[A-Za-zÀ-ÿ\s.'-]{2,80}\s*$/i, "")
+    .trim();
+}
+
+function countWords(text: string): number {
+  const words = stripGeneratedSignature(text).match(
+    /[A-Za-zÀ-ÿ0-9]+(?:[-'][A-Za-zÀ-ÿ0-9]+)*/g,
+  );
+  return words?.length || 0;
+}
+
+function isPremiumRequest(data: GenRequest): boolean {
+  return Boolean(data.messageStart?.trim() || data.premiumMessage);
+}
+
+function hasAnyNormalizedTerm(text: string, terms: string[]): boolean {
+  const normalizedText = normalizeUniverseText(text);
+  return terms.some((term) => normalizedText.includes(normalizeUniverseText(term)));
+}
+
+function validatePremiumGeneration(
+  text: string,
+  data: GenRequest,
+  universeKey: EmotionalUniverseKey,
+): { ok: boolean; wordCount: number; reason: string } {
+  const wordCount = countWords(text);
+
+  if (!isPremiumRequest(data)) {
+    return { ok: true, wordCount, reason: "" };
+  }
+
+  if (wordCount < PREMIUM_MIN_WORDS) {
+    return {
+      ok: false,
+      wordCount,
+      reason: `curta demais: ${wordCount} palavras`,
+    };
+  }
+
+  if (wordCount > PREMIUM_MAX_WORDS) {
+    return {
+      ok: false,
+      wordCount,
+      reason: `longa demais: ${wordCount} palavras`,
+    };
+  }
+
+  if (universeKey === "gratidao") {
+    const missing = [
+      hasAnyNormalizedTerm(text, [
+        "gratidão",
+        "agradeço",
+        "agradecer",
+        "obrigado",
+        "obrigada",
+        "reconhecimento",
+        "reconheço",
+      ])
+        ? ""
+        : "reconhecimento claro",
+      hasAnyNormalizedTerm(text, [
+        "importância",
+        "importa",
+        "representa",
+        "valor",
+        "valorizo",
+      ])
+        ? ""
+        : "importância da pessoa",
+      hasAnyNormalizedTerm(text, [
+        "cuidado",
+        "apoio",
+        "gesto",
+        "presença",
+        "sustenta",
+        "marcou",
+        "fez diferença",
+        "faz diferença",
+      ])
+        ? ""
+        : "impacto emocional do cuidado ou apoio",
+    ].filter(Boolean);
+
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        wordCount,
+        reason: `gratidão premium incompleta: ${missing.join(", ")}`,
+      };
+    }
+  }
+
+  return { ok: true, wordCount, reason: "" };
+}
+
+function buildPremiumRetryInstruction(
+  premiumValidation: ReturnType<typeof validatePremiumGeneration>,
+  universeKey: EmotionalUniverseKey,
+): string {
+  const lines = [
+    "A versão anterior não atingiu o padrão Premium.",
+    `Ela teve ${premiumValidation.wordCount} palavras; reescreva com obrigatoriamente ${PREMIUM_MIN_WORDS} a ${PREMIUM_MAX_WORDS} palavras no corpo do texto.`,
+    "Use exatamente esta estrutura em parágrafos fluidos: abertura pessoal, desenvolvimento emocional e fechamento marcante.",
+    "Não inclua assinatura, não escreva \"Alma Escrita\" e não escreva \"Com carinho\".",
+  ];
+
+  if (universeKey === "gratidao") {
+    lines.push(
+      "Como o universo é Gratidão, inclua reconhecimento claro, importância da pessoa e impacto emocional do cuidado ou apoio recebido, sem romance e sem reflexão genérica.",
+    );
+  }
+
+  if (premiumValidation.reason) {
+    lines.push(`Motivo da rejeição: ${premiumValidation.reason}.`);
+  }
+
+  return lines.join("\n");
 }
 
 function createGenerationId(): string {
@@ -902,20 +1028,7 @@ function buildClosing(seed: AuthorVoiceSeed | undefined, data: GenRequest, rng: 
 }
 
 function buildPremiumUniverseFallback(data: GenRequest): string {
-  const name = data.name || "você";
-  const universe = resolveEmotionalUniverse(data);
-  const messages: Record<EmotionalUniverseKey, string> = {
-    amor: `${name}, o que sinto por você continua com carinho, afeto e presença. A saudade aproxima meu pensamento dos seus detalhes, do seu sorriso e desse desejo respeitoso de estar perto sem pressa, com admiração e cuidado. Eu escolho esse romance nas pequenas atitudes, no companheirismo que acolhe e na vontade bonita de fazer você se sentir especial de um jeito leve, inteiro e verdadeiro.`,
-    fe: `${name}, sigo confiando em Deus e levando em oração aquilo que ainda precisa amadurecer. A esperança não precisa fazer barulho para renovar o propósito, porque a confiança também se constrói nos dias simples. Que sua espiritualidade encontre descanso, direção e serenidade para atravessar este momento com fé firme, coração atento e paz suficiente para continuar.`,
-    amizade: `${name}, sua amizade tem valor de apoio real, parceria e presença. Eu reconheço a lealdade que existe entre nós e o companheirismo que aparece nos dias bons e também nos difíceis. Quero que você saiba que pode contar comigo, porque vínculo verdadeiro se mostra no cuidado constante, na escuta sincera e na vontade de permanecer por perto.`,
-    pedido_desculpas: `${name}, eu reconheço meu erro e assumo a responsabilidade pelo que aconteceu. Sinto arrependimento sincero, peço perdão sem tentar diminuir o que você sentiu e quero reparar com atitudes melhores. Sei que a reconstrução exige tempo, respeito e coerência, por isso desejo provar, com cuidado e verdade, que aprendi com essa falha.`,
-    gratidao: `${name}, guardo gratidão pelo que você representa e pelo cuidado que marcou minha vida. Cada lembrança me traz reconhecimento da sua importância, dos gestos que talvez pareçam simples, mas ficaram comigo de um jeito profundo. Obrigado por ser presença, por somar nos detalhes e por deixar em mim motivos reais para valorizar nossa história.`,
-    reflexao: `${name}, este momento pede aprendizado, maturidade e tempo. Nem todo crescimento acontece de uma vez; algumas mudanças chegam aos poucos, quando a vida nos ensina a olhar com mais calma para escolhas, limites e caminhos. Quero acolher essa fase com consciência, sem pressa de parecer pronto, mas com coragem para amadurecer de verdade.`,
-    motivacao: `${name}, continue com coragem, mesmo que o recomeço pareça pequeno no início. A força nem sempre aparece como grande vitória; às vezes ela mora no passo dado com perseverança quando ninguém está vendo. Respire, organize o coração e siga, porque cada atitude firme aproxima você de uma versão mais inteira, mais confiante e mais preparada.`,
-    aniversario: `${name}, hoje é dia de celebração, alegria e vida. Que este novo ciclo chegue com bênçãos, boas lembranças e motivos sinceros para sorrir. Desejo que você receba carinho, abraços verdadeiros e a certeza de que sua presença importa. Que cada novo dia traga leveza, saúde, afeto e momentos bonitos para guardar com felicidade.`,
-  };
-
-  return messages[universe.key];
+  return buildPremiumEmotionalUniverseFallback(data);
 }
 
 function buildFallback(request: GenRequest, _seeds: AuthorVoiceSeed[]): string {
@@ -1020,6 +1133,7 @@ DADOS DO PEDIDO:
 - Detalhe/Memória especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
 - Início escrito pelo usuário: ${data.messageStart || "Não informado."}
 - Mensagem Premium: ${data.premiumMessage ? "sim" : "não"}
+- Assinatura personalizada ativa: ${data.shouldSignMessage ? "sim, aplicada fora do gerador" : "não"}
 - Tom escolhido: ${data.tone}
 - Tamanho escolhido: ${data.length} (${targetLengthGuidance})
 - Variação autoral segura: ${style}
@@ -1033,15 +1147,17 @@ REGRAS ABSOLUTAS DE ESCRITA:
 ${buildUniversePromptBlock(universe)}
 3. VOZ AUTORAL SEM CONTAMINAÇÃO: O perfil autoral acima não define tema. Ele só pode influenciar estilo, ritmo, profundidade, vocabulário e metáforas. A categoria escolhida pelo usuário sempre vence.
 4. NÃO COPIAR LIVROS: É proibido copiar, reescrever ou parafrasear reflexões, frases de impacto, trechos literais ou ensinamentos dos livros. Gere uma mensagem inédita.
-5. COMPLETAR MINHA MENSAGEM: Se "Início escrito pelo usuário" estiver informado, continue a intenção emocional desse início em aproximadamente 100 palavras. Não repita literalmente o início, não use aspas e não faça referência ao ato de completar.
-6. MENSAGEM PREMIUM: Se "Mensagem Premium" for "sim", escreva um texto mais profundo, com aproximadamente 100 a 120 palavras, mantendo o mesmo universo emocional escolhido.
-7. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: O campo "Detalhe/Memória especial" é APENAS CONTEXTO. É ESTRITAMENTE PROIBIDO copiar, colar ou parafrasear literalmente este texto. Você deve INTERPRETAR o significado emocional por trás dele e escrever uma frase original.
-8. PRIORIDADE ABSOLUTA DO DETALHE ROMÂNTICO/ÍNTIMO: Se o detalhe fornecido pelo usuário contiver elementos de desejo romântico, saudade física, beijo, abraço ou carinho íntimo, a mensagem DEVE obrigatoriamente seguir esse tom romântico, delicado e íntimo. É ESTRITAMENTE PROIBIDO ignorar esse detalhe ou substituí-lo por temas espirituais genéricos.
-9. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
-10. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade.
-11. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use linguagem poética, profunda e acolhedora somente quando isso couber no universo emocional ativo.
-12. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
-13. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
+5. COMPLETAR MINHA MENSAGEM: Se "Início escrito pelo usuário" estiver informado, continue a intenção emocional desse início em 100 a 120 palavras. Não repita literalmente o início, não use aspas e não faça referência ao ato de completar.
+6. MENSAGEM PREMIUM: Se "Mensagem Premium" for "sim", o corpo do texto deve ter obrigatoriamente entre 100 e 120 palavras. Use abertura pessoal, desenvolvimento emocional e fechamento marcante. Não entregue texto curto.
+7. ASSINATURA: Não assine o texto. Não escreva "Alma Escrita", "Com carinho" nem nome de quem envia no final. A assinatura é aplicada fora do gerador.
+8. GRATIDÃO PREMIUM: Se o universo for GRATIDÃO e a mensagem for Premium, inclua reconhecimento claro, importância da pessoa e impacto emocional do cuidado/apoio recebido. Não transforme em reflexão genérica e não use romance.
+9. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: O campo "Detalhe/Memória especial" é APENAS CONTEXTO. É ESTRITAMENTE PROIBIDO copiar, colar ou parafrasear literalmente este texto. Você deve INTERPRETAR o significado emocional por trás dele e escrever uma frase original.
+10. PRIORIDADE ABSOLUTA DO DETALHE ROMÂNTICO/ÍNTIMO: Se o detalhe fornecido pelo usuário contiver elementos de desejo romântico, saudade física, beijo, abraço ou carinho íntimo, a mensagem DEVE obrigatoriamente seguir esse tom romântico, delicado e íntimo. É ESTRITAMENTE PROIBIDO ignorar esse detalhe ou substituí-lo por temas espirituais genéricos.
+11. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
+12. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade.
+13. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use linguagem poética, profunda e acolhedora somente quando isso couber no universo emocional ativo.
+14. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
+15. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
 
 Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas:
 ${previousMessages || "- nenhuma nesta sessão"}
@@ -1055,13 +1171,19 @@ ${retryInstruction ? `REGERAÇÃO OBRIGATÓRIA:\n${retryInstruction}` : ""}
   try {
     let retryInstruction = "";
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const aiText = cleanGeneratedText(await generateAIMsg(buildPrompt(retryInstruction), data));
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const aiText = stripGeneratedSignature(await generateAIMsg(buildPrompt(retryInstruction), data));
       const validation = validateEmotionalUniverseText(aiText, data);
+      const premiumValidation = validatePremiumGeneration(aiText, data, universe.key);
       const generic = containsGenericPhrase(aiText);
       const similar = isTooSimilarToPrevious(aiText, data.previousMessages);
       const repeatedStart = repeatsMessageStart(aiText, data.messageStart);
-      const approved = validation.ok && !generic && !similar && !repeatedStart;
+      const approved =
+        validation.ok &&
+        premiumValidation.ok &&
+        !generic &&
+        !similar &&
+        !repeatedStart;
 
       console.log("[VALIDACAO_UNIVERSO]");
       console.log("tentativa:", attempt);
@@ -1069,6 +1191,8 @@ ${retryInstruction ? `REGERAÇÃO OBRIGATÓRIA:\n${retryInstruction}` : ""}
       console.log("texto_final:", aiText);
       console.log("termos_bloqueados:", validation.forbiddenTerms.join(", ") || "nenhum");
       console.log("obrigatorios_ausentes:", validation.missingRequired.join(", ") || "nenhum");
+      console.log("palavras:", premiumValidation.wordCount);
+      console.log("premium:", isPremiumRequest(data) ? premiumValidation.reason || "aprovado" : "nao");
       console.log("generico:", generic);
       console.log("similar:", similar);
       console.log("repetiu_inicio:", repeatedStart);
@@ -1078,11 +1202,15 @@ ${retryInstruction ? `REGERAÇÃO OBRIGATÓRIA:\n${retryInstruction}` : ""}
         return rememberGeneratedMessage(aiText);
       }
 
-      retryInstruction = repeatedStart
-        ? "A versão anterior repetiu literalmente o início escrito pelo usuário. Continue a intenção emocional sem copiar esse início."
-        : validation.ok
-        ? "A versão anterior foi rejeitada por conter clichê, repetição ou proximidade excessiva com mensagens recentes. Gere uma versão nova, específica e sem repetir a estrutura."
-        : buildValidationRetryInstruction(validation);
+      if (!validation.ok) {
+        retryInstruction = buildValidationRetryInstruction(validation);
+      } else if (!premiumValidation.ok) {
+        retryInstruction = buildPremiumRetryInstruction(premiumValidation, universe.key);
+      } else if (repeatedStart) {
+        retryInstruction = "A versão anterior repetiu literalmente o início escrito pelo usuário. Continue a intenção emocional sem copiar esse início.";
+      } else {
+        retryInstruction = "A versão anterior foi rejeitada por conter clichê, repetição ou proximidade excessiva com mensagens recentes. Gere uma versão nova, específica e sem repetir a estrutura.";
+      }
     }
 
     console.log("[VALIDACAO_UNIVERSO]");
@@ -1090,6 +1218,9 @@ ${retryInstruction ? `REGERAÇÃO OBRIGATÓRIA:\n${retryInstruction}` : ""}
     return rememberGeneratedMessage(buildFallback(data, seeds));
   } catch (error) {
     console.warn("IA indisponível, usando fallback seguro de universo emocional:", error);
+    if (isPremiumRequest(data)) {
+      return rememberGeneratedMessage(buildFallback(data, seeds));
+    }
     if (universe.key === "pedido_desculpas") {
       const fallback = buildApologyFallback(data);
       const validation = validateEmotionalUniverseText(fallback, data);

@@ -1,5 +1,6 @@
 import {
   buildEmotionalUniverseFallback,
+  buildPremiumEmotionalUniverseFallback,
   validateEmotionalUniverseText,
 } from "@/data/emotionalUniverses";
 
@@ -68,6 +69,7 @@ export interface GenRequest {
   sharedMemory?: string;
   messageStart?: string;
   premiumMessage?: boolean;
+  shouldSignMessage?: boolean;
   intention: string;
   tone: GenTone;
   length: GenLength;
@@ -196,6 +198,7 @@ export function normalizeGenRequest(request: GenRequest): GenRequest {
     sharedMemory: request.sharedMemory?.trim(),
     messageStart: request.messageStart?.trim(),
     premiumMessage: Boolean(request.premiumMessage),
+    shouldSignMessage: Boolean(request.shouldSignMessage),
     intention: request.intention.trim(),
     tone: GEN_TONES.includes(request.tone) ? request.tone : "emocionante",
     length: GEN_LENGTHS.includes(request.length) ? request.length : "média",
@@ -209,6 +212,13 @@ export function normalizeGenRequest(request: GenRequest): GenRequest {
 
 export function generateMessage(request: GenRequest): string {
   const data = normalizeGenRequest(request);
+
+  if (data.messageStart || data.premiumMessage) {
+    const premiumText = buildPremiumEmotionalUniverseFallback(data);
+    const validation = validateEmotionalUniverseText(premiumText, data);
+    return validation.ok ? premiumText : buildEmotionalUniverseFallback(data);
+  }
+
   const opening = pick(TONE_OPENINGS[data.tone]);
 
   const firstSentence =

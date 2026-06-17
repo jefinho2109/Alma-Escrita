@@ -66,6 +66,7 @@ interface GeneratedMessage {
   signature?: string;
   messageStart?: string;
   premiumMessage?: boolean;
+  shouldSignMessage?: boolean;
   createdAt: number;
 }
 
@@ -567,11 +568,12 @@ function App() {
       ? simpleForm.messageStart.trim()
       : "";
     const premiumMessageEnabled = premiumUser && simpleForm.premiumMessage;
+    const shouldSignMessage = premiumUser && simpleForm.signMessage && Boolean(mockUser);
 
     const request = {
       name: simpleForm.recipientName.trim(),
       senderName:
-        premiumUser && simpleForm.signMessage && mockUser
+        shouldSignMessage && mockUser
           ? mockUser.name
           : "Alma Escrita",
       relationship: mapMessageTypeToRelationship(simpleForm.messageType) as GenRelationship,
@@ -580,6 +582,7 @@ function App() {
       intention: simpleForm.importantDetail.trim() || "Uma mensagem especial",
       messageStart: premiumMessageStart || undefined,
       premiumMessage: premiumMessageEnabled,
+      shouldSignMessage,
       recipient: mapMessageTypeToRecipient(simpleForm.messageType),
       tone: mapMessageTypeToTone(simpleForm.messageType),
       length: (premiumMessageStart || premiumMessageEnabled ? "longa" : "média") as GenLength,
@@ -599,6 +602,7 @@ function App() {
         signature: premiumSignature,
         messageStart: premiumMessageStart || undefined,
         premiumMessage: premiumMessageEnabled,
+        shouldSignMessage,
         createdAt: Date.now(),
       };
       setLastGenerated(generated);
@@ -636,6 +640,7 @@ function App() {
         length: lastGenerated.length ?? "média",
         messageStart: premiumUser ? lastGenerated.messageStart : undefined,
         premiumMessage: premiumUser ? lastGenerated.premiumMessage : undefined,
+        shouldSignMessage: premiumUser ? lastGenerated.shouldSignMessage : undefined,
       };
       const text = await generateBookBasedMessage(request);
       const updated = { ...lastGenerated, ...request, text, createdAt: Date.now() };

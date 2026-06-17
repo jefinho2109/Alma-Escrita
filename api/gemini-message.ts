@@ -42,6 +42,7 @@ interface GenRequest {
   sharedMemory?: string;
   messageStart?: string;
   premiumMessage?: boolean;
+  shouldSignMessage?: boolean;
   intention: string;
   tone: GenTone;
   length: GenLength;
@@ -357,7 +358,20 @@ function buildServerUniverseFallback(request: GenRequest): string {
     motivacao: `${name}, respire e siga com coragem. Todo recomeço pede força, mas a perseverança transforma passos pequenos em uma caminhada firme.`,
     aniversario: `${name}, hoje é dia de celebração, alegria e vida. Que este novo ciclo chegue com bênçãos, boas lembranças e motivos bonitos para sorrir.`,
   };
-  return messages[universe.key];
+  const premiumMessages: Record<EmotionalUniverseKey, string> = {
+    amor: `${name}, o que sinto por você nasce do carinho e ganha presença nos detalhes. Há saudade no modo como penso no seu sorriso, no desejo respeitoso de estar perto e na admiração que cresce quando percebo sua forma de existir. Não é só romance bonito; é escolha diária, afeto cuidado e companheirismo que me fazem querer ser melhor ao seu lado. Eu gosto da calma que você desperta, da lembrança que fica depois de cada encontro e desse sentimento que não precisa correr para ser inteiro. Que você sinta, com ternura, o quanto é especial para mim, hoje e sempre.`,
+    fe: `${name}, entrego este momento a Deus com confiança, porque nem sempre a caminhada revela tudo de uma vez. Há dias em que a oração sustenta o que a pressa não resolve e a esperança renova por dentro aquilo que parecia cansado. Que seu coração encontre propósito mesmo nas esperas, serenidade nos processos e espiritualidade para seguir sem perder a paz. Eu creio que Deus cuida dos detalhes, fortalece a fé no silêncio e abre caminhos quando chega a hora certa. Que você continue firme, amparada e confiante, lembrando que nenhuma estação difícil precisa ser atravessada sem luz e segura por dentro.`,
+    amizade: `${name}, sua amizade tem um valor que eu reconheço com respeito e alegria. Em muitos momentos, seu apoio chegou sem precisar de grandes explicações, como parceria sincera de quem sabe permanecer por perto. A lealdade que existe entre nós me lembra que amizade verdadeira não vive de aparência, mas de presença, escuta e companheirismo nos dias bons e nos difíceis. Eu agradeço por poder contar com você, pela confiança que nasceu com o tempo e pela leveza que sua presença traz. Que esse vínculo continue firme, cuidado e bonito, porque amizades assim tornam a caminhada mais humana e mais possível.`,
+    pedido_desculpas: `${name}, eu quero reconhecer meu erro com responsabilidade, sem tentar diminuir o que aconteceu ou justificar o que feriu você. Sinto arrependimento sincero e entendo que perdão não se exige; ele se pede com respeito, paciência e atitudes coerentes. Se minhas escolhas causaram dor, eu assumo a parte que me cabe e desejo reparar com mais cuidado daqui para frente. Sei que reconstrução não acontece em um instante, mas começa quando alguém decide agir com verdade. Por isso, peço desculpas de coração e quero demonstrar, no tempo certo, que aprendi com essa falha e posso cuidar melhor do que ficou abalado.`,
+    gratidao: `${name}, eu guardo uma gratidão sincera por tudo o que você representa na minha vida. Seu cuidado não passou por mim como algo pequeno; ele deixou lembrança, reconhecimento e uma sensação bonita de ter sido visto com atenção. Há gestos seus que talvez pareçam simples, mas me sustentaram em momentos importantes e me ensinaram a valorizar ainda mais sua presença. Reconheço a importância que você tem na minha história e o impacto emocional do apoio que recebi de você. Por isso, hoje quero agradecer com verdade: sua forma de cuidar fez diferença, permaneceu comigo e merece ser lembrada com carinho.`,
+    reflexao: `${name}, há momentos em que a vida pede aprendizado sem pressa e maturidade para olhar com mais calma para tudo que sentimos. O tempo nem sempre responde depressa, mas revela o que precisa crescer, mudar ou permanecer com mais verdade. Talvez este seja um daqueles períodos em que o coração aprende a escutar melhor, a escolher com consciência e a transformar experiências em crescimento. Nem tudo precisa ser resolvido no mesmo dia; algumas compreensões amadurecem em silêncio. Que essa fase traga clareza, equilíbrio e uma forma mais inteira de seguir, porque amadurecer também é aprender a caminhar com mais presença.`,
+    motivacao: `${name}, continue com coragem, mesmo quando o recomeço parecer pequeno demais para ser celebrado. A força nem sempre aparece como grande vitória; muitas vezes ela mora no gesto discreto de levantar, respirar e tentar outra vez. Sua perseverança tem valor, principalmente nos dias em que ninguém vê o esforço que você faz para continuar. Não permita que uma fase difícil defina tudo o que ainda pode nascer. Organize o coração, dê o próximo passo e confie no processo que está construindo por dentro. Cada atitude firme aproxima você de uma versão mais preparada, mais livre e mais consciente da própria força.`,
+    aniversario: `${name}, hoje é dia de celebrar sua vida com alegria e reconhecimento. Que este novo ciclo chegue trazendo bênçãos, saúde, boas lembranças e motivos sinceros para sorrir. Sua presença importa para quem caminha ao seu lado, e este dia merece ser vivido com leveza, carinho e gratidão pelo caminho já percorrido. Que cada fase nova traga encontros bonitos, sonhos possíveis e momentos que aqueçam o coração. Desejo que você receba afeto verdadeiro, abraços cheios de presença e a certeza de que sua vida tem valor. Que a celebração de hoje permaneça como lembrança feliz dentro de você, com amor e alegria.`,
+  };
+
+  return request.messageStart || request.premiumMessage
+    ? premiumMessages[universe.key]
+    : messages[universe.key];
 }
 
 function pick<T>(values: T[]): T {
@@ -380,6 +394,7 @@ function normalizeGenRequest(request: GenRequest): GenRequest {
     sharedMemory: request.sharedMemory?.trim(),
     messageStart: request.messageStart?.trim(),
     premiumMessage: Boolean(request.premiumMessage),
+    shouldSignMessage: Boolean(request.shouldSignMessage),
     intention: request.intention.trim(),
     tone: GEN_TONES.includes(request.tone) ? request.tone : "emocionante",
     length: GEN_LENGTHS.includes(request.length) ? request.length : "média",
@@ -388,6 +403,10 @@ function normalizeGenRequest(request: GenRequest): GenRequest {
 
 function buildLocalFallbackMessage(request: GenRequest): string {
   const data = normalizeGenRequest(request);
+  if (data.messageStart || data.premiumMessage) {
+    return buildServerUniverseFallback(data);
+  }
+
   const opening = pick(TONE_OPENINGS[data.tone]);
 
   const firstSentence =
@@ -504,6 +523,7 @@ function parseGenerationRequest(value: unknown): GenRequest | null {
     sharedMemory: raw.sharedMemory ? String(raw.sharedMemory) : undefined,
     messageStart: raw.messageStart ? String(raw.messageStart) : undefined,
     premiumMessage: Boolean(raw.premiumMessage),
+    shouldSignMessage: Boolean(raw.shouldSignMessage),
     intention: String(raw.intention || raw.sharedMemory || ""),
     tone: (raw.tone || "emocionante") as GenTone,
     length: (raw.length || "média") as GenLength,
@@ -925,7 +945,8 @@ export default async function handler(req: any, res: any) {
           ],
           generationConfig: {
             temperature: 0.85,
-            maxOutputTokens: 420,
+            maxOutputTokens:
+              structuredRequest.messageStart || structuredRequest.premiumMessage ? 560 : 420,
           },
         }),
       },
