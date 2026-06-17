@@ -20,6 +20,18 @@ interface AuthModalProps {
 
 type View = "form" | "recover" | "recover-sent";
 
+function AuthErrorAlert({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-xs text-red-700"
+    >
+      <p className="font-semibold">Nao consegui acessar sua conta agora.</p>
+      <p className="mt-1 leading-relaxed">{message}</p>
+    </div>
+  );
+}
+
 export function AuthModal({
   open,
   onClose,
@@ -241,7 +253,7 @@ export function AuthModal({
                 </div>
 
                 {error && (
-                  <p className="text-xs text-red-500 text-center">{error}</p>
+                  <AuthErrorAlert message={error} />
                 )}
 
                 <button
@@ -350,7 +362,7 @@ export function AuthModal({
               />
 
               {error && (
-                <p className="text-xs text-red-500 text-center">{error}</p>
+                <AuthErrorAlert message={error} />
               )}
 
               <button

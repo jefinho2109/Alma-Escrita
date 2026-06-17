@@ -1,0 +1,14 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.almaescrita.oficial",
+      "sha256_cert_fingerprints": [
+        "CC:67:03:55:1A:CE:EF:68:99:BC:20:C9:6A:62:5D:38:D3:DA:46:E4:65:0D:5F:0C:1D:6F:71:CF:27:52:A3:7F",
+        "47:44:9F:4B:79:1D:FA:60:AE:AB:C4:B4:D7:E0:08:96:BC:55:A2:9E:15:E9:33:4A:A9:9F:DD:A0:28:D1:E7:33",
+        "8A:AA:76:85:C8:0C:EF:BC:B4:A9:EE:8C:B5:9B:AC:F2:3E:00:00:46:E7:60:7E:D3:7F:C3:6F:F3:DB:EA:4A:77"
+      ]
+    }
+  }
+]
