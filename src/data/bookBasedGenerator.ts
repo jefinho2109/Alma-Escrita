@@ -44,6 +44,25 @@ const lengthGuidance: Record<GenRequest["length"], string> = {
 const PREMIUM_MIN_WORDS = 100;
 const PREMIUM_MAX_WORDS = 120;
 
+const PREMIUM_GENERIC_PATTERNS = [
+  "há momentos em que",
+  "nem tudo",
+  "a vida pede",
+  "a vida ensina",
+  "a caminhada",
+  "o processo",
+  "essa fase",
+  "esta fase",
+  "versão mais",
+  "coração precisa",
+  "chegue como",
+  "motivos sinceros",
+  "presença importa",
+  "frase bonita",
+  "resposta pronta",
+  "de um jeito profundo",
+] as const;
+
 const BLOCKED_PHRASES = [
   ...GENERIC_PHRASE_BLOCKLIST,
   "eu guardei com cuidado",
@@ -316,6 +335,15 @@ function hasAnyNormalizedTerm(text: string, terms: string[]): boolean {
   return terms.some((term) => normalizedText.includes(normalizeUniverseText(term)));
 }
 
+function countGenericPremiumSignals(text: string): number {
+  const normalizedText = normalizeUniverseText(text);
+  return PREMIUM_GENERIC_PATTERNS.reduce(
+    (count, pattern) =>
+      normalizedText.includes(normalizeUniverseText(pattern)) ? count + 1 : count,
+    0,
+  );
+}
+
 function validatePremiumGeneration(
   text: string,
   data: GenRequest,
@@ -388,6 +416,29 @@ function validatePremiumGeneration(
     }
   }
 
+  const normalizedText = ` ${normalizeUniverseText(text)} `;
+  const hasFirstPerson = /\b(eu|meu|minha|me|comigo|sinto|guardo|reconheco|agradeco|amo|lembro)\b/.test(
+    normalizedText,
+  );
+  const hasDirectAddress = /\b(voce|te|seu|sua|contigo)\b/.test(normalizedText);
+  const genericSignals = countGenericPremiumSignals(text);
+
+  if (!hasFirstPerson || !hasDirectAddress) {
+    return {
+      ok: false,
+      wordCount,
+      reason: "voz pouco pessoal: falta primeira pessoa ou fala direta com a pessoa",
+    };
+  }
+
+  if (genericSignals >= 2) {
+    return {
+      ok: false,
+      wordCount,
+      reason: `voz generica demais: ${genericSignals} sinais abstratos`,
+    };
+  }
+
   return { ok: true, wordCount, reason: "" };
 }
 
@@ -399,6 +450,8 @@ function buildPremiumRetryInstruction(
     "A versão anterior não atingiu o padrão Premium.",
     `Ela teve ${premiumValidation.wordCount} palavras; reescreva com obrigatoriamente ${PREMIUM_MIN_WORDS} a ${PREMIUM_MAX_WORDS} palavras no corpo do texto.`,
     "Use exatamente esta estrutura em parágrafos fluidos: abertura pessoal, desenvolvimento emocional e fechamento marcante.",
+    "Aumente a proximidade humana: menos frase universal, mais confissão direta, memória afetiva, vulnerabilidade e sentimento concreto.",
+    "Faça parecer que uma pessoa está escrevendo para aquela pessoa específica.",
     "Não inclua assinatura, não escreva \"Alma Escrita\" e não escreva \"Com carinho\".",
   ];
 
@@ -1132,6 +1185,7 @@ DADOS DO PEDIDO:
 - Ocasião interpretada: ${occasionForPrompt}
 - Detalhe/Memória especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
 - Início escrito pelo usuário: ${data.messageStart || "Não informado."}
+- Ponto humano concreto obrigatório: ${data.sharedMemory || data.messageStart || data.intention || "um detalhe real da relação, sem inventar cena específica"}
 - Mensagem Premium: ${data.premiumMessage ? "sim" : "não"}
 - Assinatura personalizada ativa: ${data.shouldSignMessage ? "sim, aplicada fora do gerador" : "não"}
 - Tom escolhido: ${data.tone}
@@ -1149,15 +1203,17 @@ ${buildUniversePromptBlock(universe)}
 4. NÃO COPIAR LIVROS: É proibido copiar, reescrever ou parafrasear reflexões, frases de impacto, trechos literais ou ensinamentos dos livros. Gere uma mensagem inédita.
 5. COMPLETAR MINHA MENSAGEM: Se "Início escrito pelo usuário" estiver informado, continue a intenção emocional desse início em 100 a 120 palavras. Não repita literalmente o início, não use aspas e não faça referência ao ato de completar.
 6. MENSAGEM PREMIUM: Se "Mensagem Premium" for "sim", o corpo do texto deve ter obrigatoriamente entre 100 e 120 palavras. Use abertura pessoal, desenvolvimento emocional e fechamento marcante. Não entregue texto curto.
-7. ASSINATURA: Não assine o texto. Não escreva "Alma Escrita", "Com carinho" nem nome de quem envia no final. A assinatura é aplicada fora do gerador.
-8. GRATIDÃO PREMIUM: Se o universo for GRATIDÃO e a mensagem for Premium, inclua reconhecimento claro, importância da pessoa e impacto emocional do cuidado/apoio recebido. Não transforme em reflexão genérica e não use romance.
-9. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: O campo "Detalhe/Memória especial" é APENAS CONTEXTO. É ESTRITAMENTE PROIBIDO copiar, colar ou parafrasear literalmente este texto. Você deve INTERPRETAR o significado emocional por trás dele e escrever uma frase original.
-10. PRIORIDADE ABSOLUTA DO DETALHE ROMÂNTICO/ÍNTIMO: Se o detalhe fornecido pelo usuário contiver elementos de desejo romântico, saudade física, beijo, abraço ou carinho íntimo, a mensagem DEVE obrigatoriamente seguir esse tom romântico, delicado e íntimo. É ESTRITAMENTE PROIBIDO ignorar esse detalhe ou substituí-lo por temas espirituais genéricos.
-11. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
-12. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade.
-13. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use linguagem poética, profunda e acolhedora somente quando isso couber no universo emocional ativo.
-14. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt".
-15. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
+7. PADRÃO PREMIUM HUMANO: Escreva como alguém real falando com essa pessoa, não como um gerador. Use primeira pessoa, fale diretamente com "você", traga vulnerabilidade e uma emoção concreta ligada ao detalhe/memória. Prefira confissões simples ("eu sinto", "eu reconheço", "eu lembro", "me marcou") a frases universais.
+8. VOZ JEFFERSON APLICADA: A voz autoral deve aparecer no ritmo íntimo, na profundidade sóbria, na ternura sem exagero e em imagens concretas pequenas. Não use frases de efeito, moral da história, encerramento padronizado nem reflexão abstrata para parecer profundo.
+9. ASSINATURA: Não assine o texto. Não escreva "Alma Escrita", "Com carinho" nem nome de quem envia no final. A assinatura é aplicada fora do gerador.
+10. GRATIDÃO PREMIUM: Se o universo for GRATIDÃO e a mensagem for Premium, inclua reconhecimento claro, importância da pessoa e impacto emocional do cuidado/apoio recebido. Não transforme em reflexão genérica e não use romance.
+11. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: O campo "Detalhe/Memória especial" é APENAS CONTEXTO. É ESTRITAMENTE PROIBIDO copiar, colar ou parafrasear literalmente este texto. Você deve INTERPRETAR o significado emocional por trás dele e escrever uma frase original.
+12. PRIORIDADE ABSOLUTA DO DETALHE ROMÂNTICO/ÍNTIMO: Se o detalhe fornecido pelo usuário contiver elementos de desejo romântico, saudade física, beijo, abraço ou carinho íntimo, a mensagem DEVE obrigatoriamente seguir esse tom romântico, delicado e íntimo. É ESTRITAMENTE PROIBIDO ignorar esse detalhe ou substituí-lo por temas espirituais genéricos.
+13. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
+14. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade.
+15. TOM E VOZ: Escreva em primeira pessoa (eu) falando diretamente com a pessoa (você). Use linguagem poética, profunda e acolhedora somente quando isso couber no universo emocional ativo.
+16. PROIBIÇÕES: Não use palavras como "escrevo", "escrita", "mensagem", "palavras", "texto", "narrativa", "tom", "carta", "receba isso", "entrego esta mensagem". Não cite "base", "seed", "livro", "poema", "IA", "Gemini" ou "prompt". Evite "há momentos em que", "nem tudo", "a vida pede", "a caminhada", "processo", "fase" e outros fechamentos de autoajuda.
+17. FORMATO: Entregue SOMENTE o texto final, em parágrafos fluidos. Nada de títulos, listas ou comentários antes/depois.
 
 Mensagens anteriores que NÃO devem ser repetidas nem parafraseadas:
 ${previousMessages || "- nenhuma nesta sessão"}

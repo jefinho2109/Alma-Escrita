@@ -363,6 +363,39 @@ function fallbackName(request: RequestLike): string {
   return request.name?.trim() || "você";
 }
 
+function compactConcreteSignal(
+  request: RequestLike,
+  universeKey: EmotionalUniverseKey,
+): string {
+  const raw = [
+    request.sharedMemory,
+    request.messageStart,
+    request.intention,
+  ].find((value) => {
+    const normalized = normalizeUniverseText(value || "");
+    return (
+      normalized.length > 3 &&
+      !/^uma mensagem especial$/.test(normalized) &&
+      !/^nao informado$/.test(normalized)
+    );
+  });
+
+  if (!raw) return "";
+
+  const cleaned = raw
+    .replace(/^["“”]+|["“”]+$/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.!?;:]+$/g, "")
+    .trim();
+
+  if (!cleaned || detectForbiddenTerms(cleaned, EMOTIONAL_UNIVERSES[universeKey]).length > 0) {
+    return "";
+  }
+
+  const words = cleaned.match(/[A-Za-zÀ-ÿ0-9]+(?:[-'][A-Za-zÀ-ÿ0-9]+)*/g) || [];
+  return words.slice(0, 10).join(" ").toLocaleLowerCase("pt-BR");
+}
+
 export function buildEmotionalUniverseFallback(request: RequestLike): string {
   const name = fallbackName(request);
   const universe = resolveEmotionalUniverse(request);
@@ -384,16 +417,28 @@ export function buildEmotionalUniverseFallback(request: RequestLike): string {
 export function buildPremiumEmotionalUniverseFallback(request: RequestLike): string {
   const name = fallbackName(request);
   const universe = resolveEmotionalUniverse(request);
+  const concreteSignal = compactConcreteSignal(request, universe.key);
+  const memoryByUniverse: Record<EmotionalUniverseKey, string> = {
+    amor: concreteSignal || "seu jeito de chegar perto de mim",
+    fe: concreteSignal || "o que ainda tenho colocado em oração",
+    amizade: concreteSignal || "os momentos em que sua parceria me sustentou",
+    pedido_desculpas: concreteSignal || "o que eu fiz e preciso reparar",
+    gratidao: concreteSignal || "o cuidado que recebi de você",
+    reflexao: concreteSignal || "o que este tempo tem me mostrado",
+    motivacao: concreteSignal || "o esforço que ninguém vê por inteiro",
+    aniversario: concreteSignal || "a alegria de celebrar sua vida",
+  };
+  const memory = memoryByUniverse[universe.key];
 
   const messages: Record<EmotionalUniverseKey, string> = {
-    amor: `${name}, o que sinto por você nasce do carinho e ganha presença nos detalhes. Há saudade no modo como penso no seu sorriso, no desejo respeitoso de estar perto e na admiração que cresce quando percebo sua forma de existir. Não é só romance bonito; é escolha diária, afeto cuidado e companheirismo que me fazem querer ser melhor ao seu lado. Eu gosto da calma que você desperta, da lembrança que fica depois de cada encontro e desse sentimento que não precisa correr para ser inteiro. Que você sinta, com ternura, o quanto é especial para mim, hoje e sempre.`,
-    fe: `${name}, entrego este momento a Deus com confiança, porque nem sempre a caminhada revela tudo de uma vez. Há dias em que a oração sustenta o que a pressa não resolve e a esperança renova por dentro aquilo que parecia cansado. Que seu coração encontre propósito mesmo nas esperas, serenidade nos processos e espiritualidade para seguir sem perder a paz. Eu creio que Deus cuida dos detalhes, fortalece a fé no silêncio e abre caminhos quando chega a hora certa. Que você continue firme, amparada e confiante, lembrando que nenhuma estação difícil precisa ser atravessada sem luz e segura por dentro.`,
-    amizade: `${name}, sua amizade tem um valor que eu reconheço com respeito e alegria. Em muitos momentos, seu apoio chegou sem precisar de grandes explicações, como parceria sincera de quem sabe permanecer por perto. A lealdade que existe entre nós me lembra que amizade verdadeira não vive de aparência, mas de presença, escuta e companheirismo nos dias bons e nos difíceis. Eu agradeço por poder contar com você, pela confiança que nasceu com o tempo e pela leveza que sua presença traz. Que esse vínculo continue firme, cuidado e bonito, porque amizades assim tornam a caminhada mais humana e mais possível.`,
-    pedido_desculpas: `${name}, eu quero reconhecer meu erro com responsabilidade, sem tentar diminuir o que aconteceu ou justificar o que feriu você. Sinto arrependimento sincero e entendo que perdão não se exige; ele se pede com respeito, paciência e atitudes coerentes. Se minhas escolhas causaram dor, eu assumo a parte que me cabe e desejo reparar com mais cuidado daqui para frente. Sei que reconstrução não acontece em um instante, mas começa quando alguém decide agir com verdade. Por isso, peço desculpas de coração e quero demonstrar, no tempo certo, que aprendi com essa falha e posso cuidar melhor do que ficou abalado.`,
-    gratidao: `${name}, eu guardo uma gratidão sincera por tudo o que você representa na minha vida. Seu cuidado não passou por mim como algo pequeno; ele deixou lembrança, reconhecimento e uma sensação bonita de ter sido visto com atenção. Há gestos seus que talvez pareçam simples, mas me sustentaram em momentos importantes e me ensinaram a valorizar ainda mais sua presença. Reconheço a importância que você tem na minha história e o impacto emocional do apoio que recebi de você. Por isso, hoje quero agradecer com verdade: sua forma de cuidar fez diferença, permaneceu comigo e merece ser lembrada com carinho.`,
-    reflexao: `${name}, há momentos em que a vida pede aprendizado sem pressa e maturidade para olhar com mais calma para tudo que sentimos. O tempo nem sempre responde depressa, mas revela o que precisa crescer, mudar ou permanecer com mais verdade. Talvez este seja um daqueles períodos em que o coração aprende a escutar melhor, a escolher com consciência e a transformar experiências em crescimento. Nem tudo precisa ser resolvido no mesmo dia; algumas compreensões amadurecem em silêncio. Que essa fase traga clareza, equilíbrio e uma forma mais inteira de seguir, porque amadurecer também é aprender a caminhar com mais presença.`,
-    motivacao: `${name}, continue com coragem, mesmo quando o recomeço parecer pequeno demais para ser celebrado. A força nem sempre aparece como grande vitória; muitas vezes ela mora no gesto discreto de levantar, respirar e tentar outra vez. Sua perseverança tem valor, principalmente nos dias em que ninguém vê o esforço que você faz para continuar. Não permita que uma fase difícil defina tudo o que ainda pode nascer. Organize o coração, dê o próximo passo e confie no processo que está construindo por dentro. Cada atitude firme aproxima você de uma versão mais preparada, mais livre e mais consciente da própria força.`,
-    aniversario: `${name}, hoje é dia de celebrar sua vida com alegria e reconhecimento. Que este novo ciclo chegue trazendo bênçãos, saúde, boas lembranças e motivos sinceros para sorrir. Sua presença importa para quem caminha ao seu lado, e este dia merece ser vivido com leveza, carinho e gratidão pelo caminho já percorrido. Que cada fase nova traga encontros bonitos, sonhos possíveis e momentos que aqueçam o coração. Desejo que você receba afeto verdadeiro, abraços cheios de presença e a certeza de que sua vida tem valor. Que a celebração de hoje permaneça como lembrança feliz dentro de você, com amor e alegria.`,
+    amor: `${name}, quando penso em ${memory}, meu peito fica mais honesto do que eu consigo disfarçar. Eu sinto carinho, saudade e um desejo respeitoso de estar perto, não por costume, mas porque sua presença mudou o lugar das coisas dentro de mim. Gosto da sua forma de me alcançar nos detalhes, da admiração que cresce quando lembro do seu sorriso e da escolha que faço quando penso em nós. Esse romance aparece no cuidado, no companheirismo e na verdade do que eu sinto. Eu queria que você soubesse, sem rodeio, que meu amor por você é presença que fica.`,
+    fe: `${name}, quando penso em ${memory}, eu levo tudo a Deus com menos pressa e mais confiança. Há dias em que minha oração não vem perfeita, mas vem sincera, porque eu ainda acredito que a esperança encontra caminho mesmo quando a resposta demora. Peço que Deus fortaleça seu propósito, guarde sua espiritualidade e renove sua confiança nos detalhes que ninguém vê. Eu também aprendo a descansar, a respirar e a não soltar a fé quando o coração cansa. Que você se sinta amparada por dentro, como quem descobre que a paz pode chegar devagar e ainda assim chegar inteira.`,
+    amizade: `${name}, quando lembro de ${memory}, eu reconheço o quanto sua amizade tem sido apoio de verdade. Você não aparece apenas nos dias leves; sua parceria também se mostra quando a vida pede escuta, lealdade e presença sem espetáculo. Isso me toca mais do que talvez eu consiga dizer, porque companheirismo assim não se encontra em qualquer lugar. Eu valorizo sua forma de permanecer, de acolher e de fazer a caminhada parecer menos pesada. Que você saiba que pode contar comigo também, com a mesma sinceridade. Nossa amizade é um desses vínculos que dão coragem para continuar sendo quem a gente é.`,
+    pedido_desculpas: `${name}, quando encaro ${memory}, eu não quero fugir da responsabilidade que me cabe. Eu errei, e reconhecer isso dói porque sei que minhas atitudes tocaram um lugar que merecia cuidado. Sinto arrependimento sincero, com a consciência clara do que preciso mudar em mim. Peço perdão com respeito, sem exigir que você esqueça depressa ou finja que nada aconteceu. Quero reconstrução com atitudes, paciência e coerência, mesmo que leve tempo. Se ainda houver espaço, desejo reparar o que ficou ferido e provar, no cotidiano, que aprendi com essa falha.`,
+    gratidao: `${name}, quando lembro de ${memory}, minha gratidão deixa de ser ideia e vira reconhecimento vivo. Seu cuidado teve impacto real em mim; não foi apenas uma gentileza passando pelo dia, foi apoio que ficou guardado e me fez sentir visto de um jeito importante. Eu reconheço sua importância na minha história, nos gestos pequenos, na presença que sustentou e na lembrança que ainda aquece por dentro. Talvez você nem tenha percebido o quanto fez diferença, mas eu percebi. Por isso agradeço com sinceridade: o que veio de você me alcançou, me marcou e merece ser lembrado com carinho.`,
+    reflexao: `${name}, quando penso em ${memory}, percebo que o aprendizado não chegou como resposta pronta. Ele veio me pedindo maturidade, tempo e coragem para olhar com mais verdade para o que eu sinto. Algumas coisas só amadurecem quando a gente para de fugir do próprio silêncio e aceita crescer por dentro. Quero reconhecer o que mudou em mim, o que ainda precisa de cuidado e o que já não posso carregar do mesmo jeito. Se existe crescimento aqui, ele começa nessa honestidade simples: aprender também é admitir que certas fases nos tornam mais humanos.`,
+    motivacao: `${name}, quando penso em ${memory}, eu vejo uma força que talvez você mesma nem consiga medir. Há coragem no jeito como você continua, mesmo quando o recomeço parece pequeno e ninguém enxerga o esforço por trás do seu silêncio. Sua perseverança não precisa fazer barulho para ter valor; ela aparece no passo que você dá cansada, na decisão de tentar de novo e na vontade de não desistir de si. Eu queria que você se lembrasse disso nos dias difíceis: ainda existe vida esperando sua firmeza. Continue. O que você está construindo por dentro também é vitória.`,
+    aniversario: `${name}, quando penso em ${memory}, celebrar sua vida ganha um sentido mais bonito. Hoje não é só uma data; é a alegria de reconhecer sua presença, sua história e o bem que você deixa nos lugares por onde passa. Desejo que este novo ciclo venha com bênçãos, saúde, encontros sinceros e lembranças que façam seu coração sorrir sem esforço. Que você receba carinho de quem conhece seu valor e alegria de quem torce por você de verdade. Minha vontade é que este dia abrace sua vida com leveza e permaneça como uma lembrança feliz, simples e inteira.`,
   };
 
   return messages[universe.key];
