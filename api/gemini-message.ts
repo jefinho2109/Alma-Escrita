@@ -345,6 +345,44 @@ function isAllowedForServerUniverse(text: string, universe: ServerUniverse): boo
   return !universe.blocked.some((term) => includesUniverseTerm(text, term));
 }
 
+function humanizeServerInterpretedEmotion(input: string | undefined): string {
+  const normalized = normalizeUniverseText(input || "");
+
+  if (!normalized) return "";
+  if (/sentimento sincero de cuidado|presenca e afeto humano/.test(normalized)) {
+    return "o cuidado que eu guardo por você";
+  }
+  if (/pedido de perdao|pedido de desculpas|reafirmacao de amor|arrependimento|reconstrucao/.test(normalized)) {
+    return "o cuidado que eu preciso reconstruir com você";
+  }
+  if (/amor profundo|amor declarado|carinho intimo|desejo respeitoso|saudade/.test(normalized)) {
+    return "o amor que sinto por você";
+  }
+  if (/importancia da pessoa|importante|reconhecimento afetivo/.test(normalized)) {
+    return "o quanto você importa para mim";
+  }
+  if (/escolha marcante|escolha feliz|certeza afetiva/.test(normalized)) {
+    return "a escolha feliz que fiz por você";
+  }
+  if (/encorajamento|perseveranca|coragem|forca/.test(normalized)) {
+    return "a força que eu desejo ver crescer em você";
+  }
+  if (/gratidao sincera|cuidado recebido|impacto emocional do apoio|apoio/.test(normalized)) {
+    return "o cuidado que recebi de você";
+  }
+  if (/confianca em deus|oracao|esperanca|fortalecimento espiritual/.test(normalized)) {
+    return "a confiança que entrego a Deus";
+  }
+  if (/aprendizado emocional|maturidade|crescimento interior/.test(normalized)) {
+    return "o que este tempo tem me mostrado por dentro";
+  }
+  if (/celebracao da vida|novo ciclo|alegria/.test(normalized)) {
+    return "a alegria de celebrar sua vida";
+  }
+
+  return input?.replace(/\s+/g, " ").trim() || "";
+}
+
 function compactServerConcreteSignal(request: GenRequest, universe: ServerUniverse): string {
   const raw = [
     request.sharedMemory,
@@ -361,7 +399,7 @@ function compactServerConcreteSignal(request: GenRequest, universe: ServerUniver
 
   if (!raw) return "";
 
-  const cleaned = raw
+  const cleaned = humanizeServerInterpretedEmotion(raw)
     .replace(/^["“”]+|["“”]+$/g, "")
     .replace(/\s+/g, " ")
     .replace(/[.!?;:]+$/g, "")
@@ -389,7 +427,7 @@ function buildServerUniverseFallback(request: GenRequest): string {
   };
   const memory = memoryByUniverse[universe.key];
   const messages: Record<EmotionalUniverseKey, string> = {
-    amor: `${name}, eu sinto carinho por você de um jeito que pede presença, afeto e cuidado. A saudade aumenta meu desejo respeitoso de estar perto, admirando seus detalhes e escolhendo esse romance com companheirismo.`,
+    amor: `${name}, eu sinto carinho por você de um jeito que pede presença, afeto e cuidado. A saudade aumenta minha vontade de estar perto com delicadeza, admirando seus detalhes e escolhendo esse romance com companheirismo.`,
     fe: `${name}, sigo confiando em Deus e levando em oração o que ainda precisa amadurecer. Que a esperança fortaleça seu propósito e renove sua confiança com serenidade espiritual.`,
     amizade: `${name}, sua presença tem valor de parceria verdadeira. Obrigado pelo apoio, pela lealdade e pelo companheirismo que tornam nossa amizade um lugar de cuidado sincero.`,
     pedido_desculpas: `${name}, reconheço meu erro e assumo a responsabilidade pelo que aconteceu. Sinto arrependimento sincero, peço perdão de coração e quero reconstruir a confiança com atitudes melhores.`,
@@ -399,7 +437,7 @@ function buildServerUniverseFallback(request: GenRequest): string {
     aniversario: `${name}, hoje é dia de celebração, alegria e vida. Que este novo ciclo chegue com bênçãos, boas lembranças e motivos bonitos para sorrir.`,
   };
   const premiumMessages: Record<EmotionalUniverseKey, string> = {
-    amor: `${name}, quando penso em ${memory}, meu peito fica mais honesto do que eu consigo disfarçar. Eu sinto carinho, saudade e um desejo respeitoso de estar perto, não por costume, mas porque sua presença mudou o lugar das coisas dentro de mim. Gosto da sua forma de me alcançar nos detalhes, da admiração que cresce quando lembro do seu sorriso e da escolha que faço quando penso em nós. Esse romance aparece no cuidado, no companheirismo e na verdade do que eu sinto. Eu queria que você soubesse, sem rodeio, que meu amor por você é presença que fica.`,
+    amor: `${name}, quando penso em ${memory}, meu peito fica mais honesto do que eu consigo disfarçar. Eu sinto carinho, saudade e uma vontade delicada de estar perto, não por costume, mas porque sua presença mudou o lugar das coisas dentro de mim. Gosto da sua forma de me alcançar nos detalhes, da admiração que cresce quando lembro do seu sorriso e da escolha que faço quando penso em nós. Esse romance aparece no cuidado, no companheirismo e na verdade do que eu sinto. Eu queria que você soubesse, sem rodeio, que meu amor por você é presença que fica.`,
     fe: `${name}, quando penso em ${memory}, eu levo tudo a Deus com menos pressa e mais confiança. Há dias em que minha oração não vem perfeita, mas vem sincera, porque eu ainda acredito que a esperança encontra caminho mesmo quando a resposta demora. Peço que Deus fortaleça seu propósito, guarde sua espiritualidade e renove sua confiança nos detalhes que ninguém vê. Eu também aprendo a descansar, a respirar e a não soltar a fé quando o coração cansa. Que você se sinta amparada por dentro, como quem descobre que a paz pode chegar devagar e ainda assim chegar inteira.`,
     amizade: `${name}, quando lembro de ${memory}, eu reconheço o quanto sua amizade tem sido apoio de verdade. Você não aparece apenas nos dias leves; sua parceria também se mostra quando a vida pede escuta, lealdade e presença sem espetáculo. Isso me toca mais do que talvez eu consiga dizer, porque companheirismo assim não se encontra em qualquer lugar. Eu valorizo sua forma de permanecer, de acolher e de fazer a caminhada parecer menos pesada. Que você saiba que pode contar comigo também, com a mesma sinceridade. Nossa amizade é um desses vínculos que dão coragem para continuar sendo quem a gente é.`,
     pedido_desculpas: `${name}, quando encaro ${memory}, eu não quero fugir da responsabilidade que me cabe. Eu errei, e reconhecer isso dói porque sei que minhas atitudes tocaram um lugar que merecia cuidado. Sinto arrependimento sincero, com a consciência clara do que preciso mudar em mim. Peço perdão com respeito, sem exigir que você esqueça depressa ou finja que nada aconteceu. Quero reconstrução com atitudes, paciência e coerência, mesmo que leve tempo. Se ainda houver espaço, desejo reparar o que ficou ferido e provar, no cotidiano, que aprendi com essa falha.`,

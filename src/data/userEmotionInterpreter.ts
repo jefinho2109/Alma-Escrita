@@ -39,6 +39,44 @@ function isBlankIntention(input: string): boolean {
   );
 }
 
+export function humanizeInterpretedEmotion(input: string | undefined): string {
+  const normalized = normalizeInput(input || "");
+
+  if (!normalized) return "";
+  if (/sentimento sincero de cuidado|presenca e afeto humano/.test(normalized)) {
+    return "o cuidado que eu guardo por você";
+  }
+  if (/pedido de perdao|pedido de desculpas|reafirmacao de amor|arrependimento|reconstrucao/.test(normalized)) {
+    return "o cuidado que eu preciso reconstruir com você";
+  }
+  if (/amor profundo|amor declarado|carinho intimo|desejo respeitoso|saudade/.test(normalized)) {
+    return "o amor que sinto por você";
+  }
+  if (/importancia da pessoa|importante|reconhecimento afetivo/.test(normalized)) {
+    return "o quanto você importa para mim";
+  }
+  if (/escolha marcante|escolha feliz|certeza afetiva/.test(normalized)) {
+    return "a escolha feliz que fiz por você";
+  }
+  if (/encorajamento|perseveranca|coragem|forca/.test(normalized)) {
+    return "a força que eu desejo ver crescer em você";
+  }
+  if (/gratidao sincera|cuidado recebido|impacto emocional do apoio|apoio/.test(normalized)) {
+    return "o cuidado que recebi de você";
+  }
+  if (/confianca em deus|oracao|esperanca|fortalecimento espiritual/.test(normalized)) {
+    return "a confiança que entrego a Deus";
+  }
+  if (/aprendizado emocional|maturidade|crescimento interior/.test(normalized)) {
+    return "o que este tempo tem me mostrado por dentro";
+  }
+  if (/celebracao da vida|novo ciclo|alegria/.test(normalized)) {
+    return "a alegria de celebrar sua vida";
+  }
+
+  return input?.replace(/\s+/g, " ").trim() || "";
+}
+
 function fromTone(tone?: GenTone): UserEmotionInterpretation {
   switch (tone) {
     case "romântica":
