@@ -3,6 +3,7 @@ import {
   buildPremiumEmotionalUniverseFallback,
   validateEmotionalUniverseText,
 } from "@/data/emotionalUniverses";
+import { interpretGenerationRequest } from "@/data/userEmotionInterpreter";
 
 export type GenRecipient =
   | "mim"
@@ -211,7 +212,7 @@ export function normalizeGenRequest(request: GenRequest): GenRequest {
 }
 
 export function generateMessage(request: GenRequest): string {
-  const data = normalizeGenRequest(request);
+  const data = interpretGenerationRequest(normalizeGenRequest(request));
 
   if (data.messageStart || data.premiumMessage) {
     const premiumText = buildPremiumEmotionalUniverseFallback(data);

@@ -23,6 +23,7 @@ import {
   type GenTone,
   normalizeGenRequest,
 } from "@/data/generator";
+import { interpretGenerationRequest } from "@/data/userEmotionInterpreter";
 
 const toneToCategory: Record<GenTone, string> = {
   romântica: "amor",
@@ -512,7 +513,7 @@ function normalizePersonName(value: string): string {
 }
 
 function prepareRequest(request: GenRequest): GenRequest {
-  const data = normalizeGenRequest(request);
+  const data = interpretGenerationRequest(normalizeGenRequest(request));
 
   return {
     ...data,
@@ -1183,8 +1184,8 @@ DADOS DO PEDIDO:
 - Relação: ${data.relationship || data.recipient}
 - Tipo emocional dominante: ${universe.label}
 - Ocasião interpretada: ${occasionForPrompt}
-- Detalhe/Memória especial: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
-- Início escrito pelo usuário: ${data.messageStart || "Não informado."}
+- Intenção emocional interpretada do detalhe: ${data.sharedMemory || "Foque na essência e nos detalhes concretos da relação."}
+- Intenção emocional interpretada do início: ${data.messageStart || "Não informado."}
 - Ponto humano concreto obrigatório: ${data.sharedMemory || data.messageStart || data.intention || "um detalhe real da relação, sem inventar cena específica"}
 - Mensagem Premium: ${data.premiumMessage ? "sim" : "não"}
 - Assinatura personalizada ativa: ${data.shouldSignMessage ? "sim, aplicada fora do gerador" : "não"}
@@ -1201,13 +1202,13 @@ REGRAS ABSOLUTAS DE ESCRITA:
 ${buildUniversePromptBlock(universe)}
 3. VOZ AUTORAL SEM CONTAMINAÇÃO: O perfil autoral acima não define tema. Ele só pode influenciar estilo, ritmo, profundidade, vocabulário e metáforas. A categoria escolhida pelo usuário sempre vence.
 4. NÃO COPIAR LIVROS: É proibido copiar, reescrever ou parafrasear reflexões, frases de impacto, trechos literais ou ensinamentos dos livros. Gere uma mensagem inédita.
-5. COMPLETAR MINHA MENSAGEM: Se "Início escrito pelo usuário" estiver informado, continue a intenção emocional desse início em 100 a 120 palavras. Não repita literalmente o início, não use aspas e não faça referência ao ato de completar.
+5. COMPLETAR MINHA MENSAGEM: Se "Intenção emocional interpretada do início" estiver informada, continue essa intenção em 100 a 120 palavras. Não repita literalmente o início original do usuário, não use aspas e não faça referência ao ato de completar.
 6. MENSAGEM PREMIUM: Se "Mensagem Premium" for "sim", o corpo do texto deve ter obrigatoriamente entre 100 e 120 palavras. Use abertura pessoal, desenvolvimento emocional e fechamento marcante. Não entregue texto curto.
 7. PADRÃO PREMIUM HUMANO: Escreva como alguém real falando com essa pessoa, não como um gerador. Use primeira pessoa, fale diretamente com "você", traga vulnerabilidade e uma emoção concreta ligada ao detalhe/memória. Prefira confissões simples ("eu sinto", "eu reconheço", "eu lembro", "me marcou") a frases universais.
 8. VOZ JEFFERSON APLICADA: A voz autoral deve aparecer no ritmo íntimo, na profundidade sóbria, na ternura sem exagero e em imagens concretas pequenas. Não use frases de efeito, moral da história, encerramento padronizado nem reflexão abstrata para parecer profundo.
 9. ASSINATURA: Não assine o texto. Não escreva "Alma Escrita", "Com carinho" nem nome de quem envia no final. A assinatura é aplicada fora do gerador.
 10. GRATIDÃO PREMIUM: Se o universo for GRATIDÃO e a mensagem for Premium, inclua reconhecimento claro, importância da pessoa e impacto emocional do cuidado/apoio recebido. Não transforme em reflexão genérica e não use romance.
-11. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: O campo "Detalhe/Memória especial" é APENAS CONTEXTO. É ESTRITAMENTE PROIBIDO copiar, colar ou parafrasear literalmente este texto. Você deve INTERPRETAR o significado emocional por trás dele e escrever uma frase original.
+11. INTERPRETAÇÃO SEMÂNTICA OBRIGATÓRIA: Os campos acima já são intenções emocionais interpretadas. Use somente essas intenções, nunca tente reproduzir o texto literal digitado pelo usuário.
 12. PRIORIDADE ABSOLUTA DO DETALHE ROMÂNTICO/ÍNTIMO: Se o detalhe fornecido pelo usuário contiver elementos de desejo romântico, saudade física, beijo, abraço ou carinho íntimo, a mensagem DEVE obrigatoriamente seguir esse tom romântico, delicado e íntimo. É ESTRITAMENTE PROIBIDO ignorar esse detalhe ou substituí-lo por temas espirituais genéricos.
 13. ANTI-REPETIÇÃO: Nenhuma frase ou ideia principal pode aparecer duas vezes na mesma mensagem com palavras iguais ou quase iguais. Evite ecos e redundâncias.
 14. DOMÍNIO DA OCASIÃO: Se a ocasião for "Pedido de desculpas" ou similar, a mensagem DEVE conter explicitamente: reconhecimento do erro, arrependimento sincero, pedido de perdão e responsabilidade.
