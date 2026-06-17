@@ -160,6 +160,15 @@ const simpleTextCorrections: Array<[RegExp, string]> = [
   [/\bsaudadee+\b/gi, "saudade"],
 ];
 
+const grammaticalContractions: Array<[RegExp, string]> = [
+  [/\bem\s+o\b/gi, "no"],
+  [/\bem\s+a\b/gi, "na"],
+  [/\bde\s+o\b/gi, "do"],
+  [/\bde\s+a\b/gi, "da"],
+  [/\bpor\s+o\b/gi, "pelo"],
+  [/\bpor\s+a\b/gi, "pela"],
+];
+
 const fallbackOpenings = {
   self: [
     "Hoje eu me escuto com mais verdade e menos cobrança.",
@@ -307,9 +316,21 @@ function containsGenericPhrase(text: string): boolean {
 }
 
 function cleanGeneratedText(text: string): string {
-  return text
+  const cleaned = text
     .replace(/^["“”]+|["“”]+$/g, "")
     .replace(/\s+/g, " ")
+    .trim();
+
+  return grammaticalContractions
+    .reduce(
+      (value, [pattern, replacement]) =>
+        value.replace(pattern, (match) =>
+          /^[A-Z]/.test(match)
+            ? replacement.charAt(0).toLocaleUpperCase("pt-BR") + replacement.slice(1)
+            : replacement,
+        ),
+      cleaned,
+    )
     .trim();
 }
 
