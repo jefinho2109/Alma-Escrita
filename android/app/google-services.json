@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "785112659116",
+    "project_id": "alma-escrita-d1850",
+    "storage_bucket": "alma-escrita-d1850.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785112659116:android:9385969469907cf34fdb09",
+        "android_client_info": {
+          "package_name": "br.com.almaescrita.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "785112659116-d4hid4p9mh64tpshacrq5j7rfofk5dns.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWvkUFH21HhGGx3g5KtUV6fe2D5k3oGbk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "785112659116-d4hid4p9mh64tpshacrq5j7rfofk5dns.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
