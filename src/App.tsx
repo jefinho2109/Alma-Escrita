@@ -9,44 +9,42 @@ import {
   type Message,
   type Mood,
 } from "@/data/messages";
-import { AuthModal, type MockUser } from "@/components/AuthModal";
+import { AuthModal } from "@/components/AuthModal";
 import { ProfileModal } from "@/components/ProfileModal";
 import PremiumModal from "@/components/PremiumModal";
-import ImageCreator from "@/components/ImageCreator";
-import MessageSpeaker from "@/components/MessageSpeaker";
 import {
-  GEN_LENGTHS,
-  GEN_OCCASIONS,
-  GEN_RELATIONSHIPS,
+  GEN_MOODS,
   GEN_RECIPIENTS,
-  GEN_TONES,
-  type GenLength,
-  type GenOccasion,
+  type GenMood,
   type GenRecipient,
-  type GenRelationship,
-  type GenTone,
 } from "@/data/generator";
-import { generateBookBasedMessage } from "@/data/bookBasedGenerator";
+import { logoutUser, watchAuthState, type AppUser } from "@/lib/firebase";
+import { getHistoryLimit, isPremiumUser } from "@/lib/premium";
+import { gerarMensagemComMotorAlma } from "@/services/almaAI";
 import {
-  PREMIUM_TEST_ENABLED,
-  buildPremiumSignature,
-  getPremiumUserName,
-  isPremiumUser,
-} from "@/lib/premium";
+  downloadSimpleMessageImage,
+  exportMessageImage,
+  getVisualBackgroundName,
+  nextVisualBackground,
+  shareSimpleMessageImage,
+  type VisualBackground,
+} from "@/services/imageExport";
 
 const ALMA_SONORA_URL =
-  "https://alma-sonora.vercel.app/";
+  "https://copyright-music-hub--jeffersondesign.replit.app";
+
+const SHARE_SIGNATURE = "— Alma Escrita";
+
 const FAVORITES_KEY = "alma-escrita:favorites";
 const COPIED_KEY = "alma-escrita:last-copied";
 const FILTER_KEY = "alma-escrita:last-filter";
 const CUSTOM_FAVORITES_KEY = "alma-escrita:custom-favorites";
 const LAST_GENERATED_KEY = "alma-escrita:last-generated";
-const SIMPLE_GEN_FORM_KEY = "alma-escrita:simple-gen-form";
+const GEN_FORM_KEY = "alma-escrita:gen-form";
 const RECENT_KEY = "alma-escrita:recent";
-const RECENT_LIMIT = 5;
 const DAILY_KEY = "alma-escrita:daily";
 const THEME_KEY = "alma-escrita:theme";
-const SHARE_SIGNATURE = SIGNATURE;
+const VISUAL_BACKGROUND_KEY = "alma-escrita:visual-background";
 
 type Theme = "light" | "dark";
 
@@ -58,48 +56,16 @@ type Filter =
 interface GeneratedMessage {
   id: string;
   name: string;
-  intention: string;
+  mood: GenMood;
   recipient: GenRecipient;
-  tone: GenTone;
-  length: GenLength;
   text: string;
-  signature?: string;
-  messageStart?: string;
-  premiumMessage?: boolean;
-  shouldSignMessage?: boolean;
   createdAt: number;
 }
 
-export type SimpleMessageType = 
-  | "Amor"
-  | "Gratidão"
-  | "Reflexão"
-  | "Motivação"
-  | "Pedido de Desculpas"
-  | "Aniversário"
-  | "Amizade"
-  | "Família";
-
-export interface SimpleGenForm {
-  recipientName: string;
-  messageType: SimpleMessageType;
-  importantDetail: string;
-  signMessage: boolean;
-  messageStart: string;
-  premiumMessage: boolean;
-}
-
-// Legacy interface kept for internal mapping compatibility
 interface GenForm {
   name: string;
-  senderName: string;
-  relationship: string;
-  occasion: string;
-  sharedMemory: string;
-  intention: string;
+  mood: GenMood;
   recipient: GenRecipient;
-  tone: GenTone;
-  length: GenLength;
 }
 
 type RecentItem =
@@ -118,14 +84,6 @@ type RecentItem =
       label: string;
       addedAt: number;
     };
-
-function getGeneratedSignature(message: GeneratedMessage | null): string {
-  return message?.signature?.trim() || SIGNATURE;
-}
-
-function formatWithSignature(text: string, signature: string): string {
-  return [text.trim(), signature.trim()].filter(Boolean).join("\n\n");
-}
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [state, setState] = useState<T>(() => {
@@ -211,51 +169,6 @@ function categoryEmoji(c: Category): string {
   }
 }
 
-function mapMessageTypeToRecipient(type: SimpleMessageType): GenRecipient {
-  switch (type) {
-    case "Amor": return "amor";
-    case "Família": return "família";
-    case "Amizade": return "amigo";
-    default: return "outro";
-  }
-}
-
-function mapMessageTypeToRelationship(type: SimpleMessageType): string {
-  switch (type) {
-    case "Amor": return "Namorado";
-    case "Família": return "Outro";
-    case "Amizade": return "Amigo";
-    case "Pedido de Desculpas": return "Outro";
-    default: return "Outro";
-  }
-}
-
-function mapMessageTypeToOccasion(type: SimpleMessageType): string {
-  switch (type) {
-    case "Amor": return "Declaração de amor";
-    case "Gratidão": return "Agradecimento";
-    case "Reflexão": return "Fé e superação";
-    case "Motivação": return "Motivação";
-    case "Pedido de Desculpas": return "Pedido de desculpas";
-    case "Aniversário": return "Aniversário";
-    case "Amizade": return "Homenagem";
-    case "Família": return "Homenagem";
-  }
-}
-
-function mapMessageTypeToTone(type: SimpleMessageType): GenTone {
-  switch (type) {
-    case "Amor": return "romântica";
-    case "Gratidão": return "gratidão";
-    case "Reflexão": return "reflexão";
-    case "Motivação": return "motivacional";
-    case "Pedido de Desculpas": return "perdão";
-    case "Aniversário": return "emocionante";
-    case "Amizade": return "emocionante";
-    case "Família": return "gratidão";
-  }
-}
-
 function App() {
   const [filter, setFilter] = useLocalStorageState<Filter>(FILTER_KEY, {
     kind: "none",
@@ -268,13 +181,10 @@ function App() {
     COPIED_KEY,
     null,
   );
-  const [simpleForm, setSimpleForm] = useLocalStorageState<SimpleGenForm>(SIMPLE_GEN_FORM_KEY, {
-    recipientName: "",
-    messageType: "Amor",
-    importantDetail: "",
-    signMessage: false,
-    messageStart: "",
-    premiumMessage: false,
+  const [genForm, setGenForm] = useLocalStorageState<GenForm>(GEN_FORM_KEY, {
+    name: "",
+    mood: "feliz",
+    recipient: "amor",
   });
   const [lastGenerated, setLastGenerated] =
     useLocalStorageState<GeneratedMessage | null>(LAST_GENERATED_KEY, null);
@@ -294,27 +204,30 @@ function App() {
     () => currentGreeting()
   );
   const [theme, setTheme] = useLocalStorageState<Theme>(THEME_KEY, "light");
+  const [visualBackground, setVisualBackground] =
+    useLocalStorageState<VisualBackground>(VISUAL_BACKGROUND_KEY, "aurora");
   const [toast, setToast] = useState<string | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
-  const [imageCreatorText, setImageCreatorText] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("home");
   const [viewerItem, setViewerItem] = useState<RecentItem | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
-  const [mockUser, setMockUser] = useState<MockUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [premiumOpen, setPremiumOpen] = useState(false);
-  const [generatingCustom, setGeneratingCustom] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const generatedRef = useRef<HTMLDivElement | null>(null);
-  const premiumUser = isPremiumUser(mockUser);
-  const premiumDisplayName = premiumUser && mockUser ? getPremiumUserName(mockUser) : "";
 
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    return watchAuthState(setUser);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -382,20 +295,6 @@ function App() {
   }, [creatorOpen]);
 
   useEffect(() => {
-    if (!imageCreatorText) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setImageCreatorText(null);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [imageCreatorText]);
-
-  useEffect(() => {
     if (!menuOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -458,10 +357,14 @@ function App() {
         ? `Para quem se sente ${filter.value.toLowerCase()}`
         : "Todas as mensagens";
 
+  const premiumUser = isPremiumUser(user);
+  const historyLimit = getHistoryLimit(user);
+
   function pushRecent(item: RecentItem) {
     setRecent((prev) => {
       const filtered = prev.filter((r) => r.key !== item.key);
-      return [item, ...filtered].slice(0, RECENT_LIMIT);
+      const next = [item, ...filtered];
+      return historyLimit === null ? next : next.slice(0, historyLimit);
     });
   }
 
@@ -517,29 +420,82 @@ function App() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  function openImageCreator(_message: string, _signature = SIGNATURE) {
-    if (!premiumUser) {
-      openPremiumGate();
-      return;
+  async function handleLogout() {
+    try {
+      await logoutUser();
+      setUser(null);
+      setProfileOpen(false);
+      setMenuOpen(false);
+    } catch {
+      setToast("Nao consegui sair agora. Tente novamente.");
     }
-    setToast("Imagem para status e redes sociais será ativada em breve.");
-  }
-
-  function openPremiumGate() {
-    setPremiumOpen(true);
-  }
-
-  function activatePremiumPlaceholder() {
-    setPremiumOpen(false);
-    setToast("Pagamento será ativado em breve.");
   }
 
   function requirePremium(action: () => void) {
+    if (!user) {
+      setPremiumOpen(true);
+      return;
+    }
     if (!premiumUser) {
-      openPremiumGate();
+      setPremiumOpen(true);
       return;
     }
     action();
+  }
+
+  function exportPremiumGeneratedImage(format: "story" | "square") {
+    if (!lastGenerated) return;
+    try {
+      exportMessageImage({
+        text: lastGenerated.text,
+        signature: SIGNATURE,
+        background: visualBackground,
+        format,
+      });
+      setToast(
+        format === "story"
+          ? "Imagem para Status/Stories exportada"
+          : "Imagem exportada",
+      );
+    } catch {
+      setToast("Nao consegui exportar a imagem agora.");
+    }
+  }
+
+  function downloadSimpleGeneratedImage() {
+    if (!lastGenerated) return;
+    try {
+      downloadSimpleMessageImage({
+        text: lastGenerated.text,
+        signature: SHARE_SIGNATURE,
+      });
+      setToast("Imagem simples baixada");
+    } catch {
+      setToast("Não consegui gerar a imagem simples agora.");
+    }
+  }
+
+  async function shareSimpleGeneratedImage() {
+    if (!lastGenerated) return;
+    try {
+      const result = await shareSimpleMessageImage({
+        text: lastGenerated.text,
+        signature: SHARE_SIGNATURE,
+      });
+      setToast(
+        result === "shared"
+          ? "Imagem simples compartilhada"
+          : "Compartilhamento indisponível; baixei a imagem simples",
+      );
+    } catch {
+      setToast("Não consegui compartilhar a imagem simples agora.");
+    }
+  }
+
+  function rotateVisualBackground() {
+    const next = nextVisualBackground(visualBackground);
+    setVisualBackground(next);
+    setToast(`Fundo visual: ${getVisualBackgroundName(next)}`);
   }
 
   function toggleFavorite(id: string) {
@@ -555,63 +511,31 @@ function App() {
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    if (!simpleForm.recipientName.trim()) {
-      setToast("Por favor, informe para quem é a mensagem.");
-      return;
-    }
-    
-    const premiumSignature =
-      premiumUser && simpleForm.signMessage && mockUser
-        ? buildPremiumSignature(mockUser)
-        : SIGNATURE;
-    const premiumMessageStart = premiumUser
-      ? simpleForm.messageStart.trim()
-      : "";
-    const premiumMessageEnabled = premiumUser && simpleForm.premiumMessage;
-    const shouldSignMessage = premiumUser && simpleForm.signMessage && Boolean(mockUser);
+    if (generating) return;
 
-    const request = {
-      name: simpleForm.recipientName.trim(),
-      senderName:
-        shouldSignMessage && mockUser
-          ? mockUser.name
-          : "Alma Escrita",
-      relationship: mapMessageTypeToRelationship(simpleForm.messageType) as GenRelationship,
-      occasion: mapMessageTypeToOccasion(simpleForm.messageType) as GenOccasion,
-      sharedMemory: simpleForm.importantDetail.trim() || undefined,
-      intention: simpleForm.importantDetail.trim() || "Uma mensagem especial",
-      messageStart: premiumMessageStart || undefined,
-      premiumMessage: premiumMessageEnabled,
-      shouldSignMessage,
-      recipient: mapMessageTypeToRecipient(simpleForm.messageType),
-      tone: mapMessageTypeToTone(simpleForm.messageType),
-      length: (premiumMessageStart || premiumMessageEnabled ? "longa" : "média") as GenLength,
-    };
+    setGenerating(true);
 
-    setGeneratingCustom(true);
     try {
-      const text = await generateBookBasedMessage(request);
+      const text = await gerarMensagemComMotorAlma({
+        name: genForm.name.trim(),
+        mood: genForm.mood,
+        recipient: genForm.recipient,
+      });
       const generated: GeneratedMessage = {
         id: `gen-${Date.now()}`,
-        name: request.name.trim(),
-        intention: request.intention.trim(),
-        recipient: request.recipient,
-        tone: request.tone,
-        length: request.length,
+        name: genForm.name.trim(),
+        mood: genForm.mood,
+        recipient: genForm.recipient,
         text,
-        signature: premiumSignature,
-        messageStart: premiumMessageStart || undefined,
-        premiumMessage: premiumMessageEnabled,
-        shouldSignMessage,
         createdAt: Date.now(),
       };
       setLastGenerated(generated);
-      setToast("Mensagem criada com carinho ✨");
+      setToast("Mensagem criada pelo Motor Alma");
       pushRecent({
         kind: "generated",
         key: `g:${generated.id}`,
         text,
-        label: `Personalizada · ${generated.tone}`,
+        label: `Personalizada · ${generated.mood}`,
         addedAt: Date.now(),
       });
       requestAnimationFrame(() => {
@@ -620,43 +544,39 @@ function App() {
           block: "center",
         });
       });
-    } catch (error) {
-      console.error("Erro ao gerar mensagem personalizada:", error);
-      setToast("Não consegui gerar a mensagem agora. Tente novamente.");
+    } catch {
+      setToast("Não consegui gerar a mensagem agora. Tente novamente em instantes.");
     } finally {
-      setGeneratingCustom(false);
+      setGenerating(false);
     }
   }
 
   async function regenerate() {
     if (!lastGenerated) return;
-    setGeneratingCustom(true);
+    if (generating) return;
+
+    setGenerating(true);
+
     try {
-      const request = {
+      const text = await gerarMensagemComMotorAlma({
         name: lastGenerated.name,
-        intention: lastGenerated.intention ?? "",
+        mood: lastGenerated.mood,
         recipient: lastGenerated.recipient,
-        tone: lastGenerated.tone ?? "emocionante",
-        length: lastGenerated.length ?? "média",
-        messageStart: premiumUser ? lastGenerated.messageStart : undefined,
-        premiumMessage: premiumUser ? lastGenerated.premiumMessage : undefined,
-        shouldSignMessage: premiumUser ? lastGenerated.shouldSignMessage : undefined,
-      };
-      const text = await generateBookBasedMessage(request);
-      const updated = { ...lastGenerated, ...request, text, createdAt: Date.now() };
+      });
+      const updated = { ...lastGenerated, text, createdAt: Date.now() };
       setLastGenerated(updated);
       pushRecent({
         kind: "generated",
         key: `g:${updated.id}-${updated.createdAt}`,
         text,
-        label: `Personalizada · ${updated.tone}`,
+        label: `Personalizada · ${updated.mood}`,
         addedAt: Date.now(),
       });
-    } catch (error) {
-      console.error("Erro ao gerar outra mensagem personalizada:", error);
-      setToast("Não consegui gerar outra mensagem agora.");
+      setToast("Nova mensagem criada pelo Motor Alma");
+    } catch {
+      setToast("Não consegui gerar outra mensagem agora. Tente novamente em instantes.");
     } finally {
-      setGeneratingCustom(false);
+      setGenerating(false);
     }
   }
 
@@ -666,7 +586,7 @@ function App() {
       (g) =>
         g.text === lastGenerated.text &&
         g.name === lastGenerated.name &&
-        g.tone === lastGenerated.tone &&
+        g.mood === lastGenerated.mood &&
         g.recipient === lastGenerated.recipient,
     );
 
@@ -679,14 +599,17 @@ function App() {
             !(
               g.text === lastGenerated.text &&
               g.name === lastGenerated.name &&
-              g.tone === lastGenerated.tone &&
+              g.mood === lastGenerated.mood &&
               g.recipient === lastGenerated.recipient
             ),
         ),
       );
       setToast("Removida dos favoritos");
     } else {
-      setCustomFavorites((prev) => [lastGenerated, ...prev].slice(0, 50));
+      setCustomFavorites((prev) => {
+        const next = [lastGenerated, ...prev];
+        return premiumUser ? next : next.slice(0, 50);
+      });
       setToast("Salva nos seus favoritos ♥");
     }
   }
@@ -708,7 +631,7 @@ function App() {
 
       {/* Top-right controls: auth + theme toggle */}
       <div className="fixed top-4 right-4 sm:top-5 sm:right-5 z-40 flex items-center gap-2">
-        {mockUser ? (
+        {user ? (
           <>
             {/* "Olá, nome" pill — clickable to open profile (desktop only) */}
             <button
@@ -718,9 +641,9 @@ function App() {
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.85)] backdrop-blur hover:bg-[hsl(var(--card))] text-xs font-medium text-[hsl(var(--foreground))] shadow-md max-w-[160px] truncate transition"
             >
               <span aria-hidden className="shrink-0 h-5 w-5 rounded-full bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-[10px] font-bold">
-                {mockUser.name.charAt(0).toUpperCase()}
+                {user.name.charAt(0).toUpperCase()}
               </span>
-              <span className="truncate">Olá, {mockUser.name.split(" ")[0]}</span>
+              <span className="truncate">Olá, {user.name.split(" ")[0]}</span>
             </button>
             {/* Avatar button — opens profile on mobile */}
             <button
@@ -729,7 +652,7 @@ function App() {
               aria-label="Ver perfil"
               className="sm:hidden h-10 w-10 rounded-full bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-sm font-bold shadow-md hover:opacity-90 transition"
             >
-              {mockUser.name.charAt(0).toUpperCase()}
+              {user.name.charAt(0).toUpperCase()}
             </button>
           </>
         ) : (
@@ -871,6 +794,15 @@ function App() {
                   },
                 },
                 {
+                  key: "premium",
+                  label: "Premium",
+                  icon: "♛",
+                  onClick: () => {
+                    setMenuOpen(false);
+                    setPremiumOpen(true);
+                  },
+                },
+                {
                   key: "alma-sonora",
                   label: "Acessar Alma Sonora",
                   icon: "🎧",
@@ -879,7 +811,7 @@ function App() {
                     window.open(ALMA_SONORA_URL, "_blank", "noopener,noreferrer");
                   },
                 },
-                ...(!mockUser
+                ...(!user
                   ? [
                       {
                         key: "auth",
@@ -934,18 +866,18 @@ function App() {
           </nav>
 
           {/* User area */}
-          {mockUser ? (
+          {user ? (
             <div className="px-5 py-4 border-t border-[hsl(var(--border))]">
               <div className="flex items-center gap-3 mb-3">
                 <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-sm font-semibold shrink-0">
-                  {mockUser.name.charAt(0).toUpperCase()}
+                  {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-[hsl(var(--foreground))] truncate">
-                    {mockUser.name}
+                    {user.name}
                   </p>
                   <p className="text-xs text-[hsl(var(--muted-foreground))] truncate">
-                    {mockUser.email}
+                    {user.email}
                   </p>
                 </div>
               </div>
@@ -969,7 +901,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setMockUser(null);
+                    void handleLogout();
                     setMenuOpen(false);
                   }}
                   className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-[hsl(var(--muted))] transition text-[hsl(var(--muted-foreground))]"
@@ -1082,17 +1014,6 @@ function App() {
                 <span aria-hidden>↗</span>
                 Compartilhar
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  openImageCreator(applyGreeting(greeting, dailyMessage.text))
-                }
-                className="btn-soft inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium px-4 py-2 rounded-full"
-              >
-                <span aria-hidden>▣</span>
-                Gerar imagem
-              </button>
-              <MessageSpeaker text={applyGreeting(greeting, dailyMessage.text)} />
             </div>
           </article>
         </section>
@@ -1201,15 +1122,6 @@ function App() {
                       <span aria-hidden>↗</span>
                       Compartilhar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => openImageCreator(q.text)}
-                      className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
-                    >
-                      <span aria-hidden>▣</span>
-                      Gerar imagem
-                    </button>
-                    <MessageSpeaker text={q.text} />
                   </div>
                 </article>
               );
@@ -1454,15 +1366,6 @@ function App() {
                         <span aria-hidden>↗</span>
                         Compartilhar
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openImageCreator(m.text)}
-                        className="btn-soft inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
-                      >
-                        <span aria-hidden>▣</span>
-                        Gerar imagem
-                      </button>
-                      <MessageSpeaker text={m.text} />
                     </div>
                   </article>
                 );
@@ -1477,42 +1380,6 @@ function App() {
           Feito com carinho · Jefferson Poeta Sonhador
         </p>
       </footer>
-
-      {/* Image Creator Modal */}
-      {imageCreatorText && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="image-creator-title"
-          className="fixed inset-0 z-[58] flex items-end sm:items-center justify-center fade-in"
-        >
-          <div
-            className="absolute inset-0 bg-[hsl(var(--foreground)/0.45)] backdrop-blur-sm"
-            onClick={() => setImageCreatorText(null)}
-          />
-          <div className="relative w-full sm:max-w-xl mx-auto sm:m-6 max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[hsl(var(--background))] shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 sm:px-7 py-4 bg-[hsl(var(--background))] border-b border-[hsl(var(--border))]">
-              <h2
-                id="image-creator-title"
-                className="font-serif text-xl sm:text-2xl text-[hsl(var(--primary))] truncate"
-              >
-                Gerar imagem
-              </h2>
-              <button
-                type="button"
-                aria-label="Fechar"
-                onClick={() => setImageCreatorText(null)}
-                className="shrink-0 h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] text-lg leading-none flex items-center justify-center"
-              >
-                ×
-              </button>
-            </div>
-            <div className="px-5 sm:px-7 py-6">
-              <ImageCreator text={imageCreatorText} />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Creator Modal */}
       {creatorOpen && (
@@ -1551,207 +1418,79 @@ function App() {
 
             <div className="px-5 sm:px-7 py-6">
               <p className="text-sm text-[hsl(var(--muted-foreground))] mb-5">
-                Preencha os campos abaixo e eu escrevo uma mensagem feita só
-                para esse momento.
+                Conte um pouco sobre você — eu escrevo uma mensagem feita só
+                pra esse momento.
               </p>
 
-              {premiumUser && (
-                <div className="-mt-2 mb-5 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--primary)/0.08)] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--primary))]">
-                  <span aria-hidden>✨</span>
-                  Premium teste ativo
-                </div>
-              )}
-
-              <form onSubmit={handleGenerate} className="grid gap-5">
+              <form onSubmit={handleGenerate} className="grid gap-4">
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    PARA QUEM É A MENSAGEM?
+                    Nome da pessoa
                   </span>
                   <input
                     type="text"
-                    placeholder="Ex.: Jordan, Alessandra, Patricia, Dalva"
-                    value={simpleForm.recipientName}
+                    inputMode="text"
+                    autoComplete="off"
+                    placeholder="Ex.: GT"
+                    value={genForm.name}
                     onChange={(e) =>
-                      setSimpleForm({ ...simpleForm, recipientName: e.target.value })
+                      setGenForm({ ...genForm, name: e.target.value })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-base"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   />
                 </label>
 
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    TIPO DA MENSAGEM
+                    Como você está se sentindo?
                   </span>
                   <select
-                    value={simpleForm.messageType}
+                    value={genForm.mood}
                     onChange={(e) =>
-                      setSimpleForm({ ...simpleForm, messageType: e.target.value as SimpleMessageType })
+                      setGenForm({
+                        ...genForm,
+                        mood: e.target.value as GenMood,
+                      })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition text-base"
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
                   >
-                    <option value="Amor">❤️ Amor</option>
-                    <option value="Gratidão">🙏 Gratidão</option>
-                    <option value="Reflexão">✨ Reflexão</option>
-                    <option value="Motivação">🌻 Motivação</option>
-                    <option value="Pedido de Desculpas">💔 Pedido de Desculpas</option>
-                    <option value="Aniversário">🎂 Aniversário</option>
-                    <option value="Amizade">🤝 Amizade</option>
-                    <option value="Família">👨‍👩‍👧 Família</option>
+                    {GEN_MOODS.map((m) => (
+                      <option key={m} value={m}>
+                        {m.charAt(0).toUpperCase() + m.slice(1)}
+                      </option>
+                    ))}
                   </select>
                 </label>
 
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                    CONTE ALGO IMPORTANTE
+                    Para quem é a mensagem?
                   </span>
-                  <textarea
-                    rows={4}
-                    placeholder="Ex.: Ela esteve ao meu lado nos momentos mais difíceis.&#10;Você me disse que se sentiu abandonado quando não fui ao seu jogo.&#10;Quero agradecer por tudo o que fez por mim."
-                    value={simpleForm.importantDetail}
+                  <select
+                    value={genForm.recipient}
                     onChange={(e) =>
-                      setSimpleForm({ ...simpleForm, importantDetail: e.target.value })
+                      setGenForm({
+                        ...genForm,
+                        recipient: e.target.value as GenRecipient,
+                      })
                     }
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition resize-none text-base"
-                  />
+                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition"
+                  >
+                    {GEN_RECIPIENTS.map((r) => (
+                      <option key={r} value={r}>
+                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-
-                <div
-                  role={!premiumUser ? "button" : undefined}
-                  tabIndex={!premiumUser ? 0 : undefined}
-                  onClick={() => {
-                    if (!premiumUser) openPremiumGate();
-                  }}
-                  onKeyDown={(e) => {
-                    if (premiumUser) return;
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openPremiumGate();
-                    }
-                  }}
-                  className={`flex items-center gap-3 p-4 rounded-xl border transition ${
-                    premiumUser
-                      ? "bg-[hsl(var(--muted))] border-[hsl(var(--border))]"
-                      : "bg-[hsl(var(--muted)/0.65)] border-dashed border-[hsl(var(--border))] cursor-pointer"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    id="signMessage"
-                    checked={premiumUser && simpleForm.signMessage}
-                    disabled={!premiumUser}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      setSimpleForm({ ...simpleForm, signMessage: e.target.checked })
-                    }
-                    className="h-5 w-5 rounded border-[hsl(var(--border))] text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]"
-                  />
-                  <div className="flex-1">
-                    <label htmlFor="signMessage" className="text-sm font-medium text-[hsl(var(--foreground))] cursor-pointer select-none">
-                      Assinar mensagem
-                    </label>
-                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
-                      {premiumUser && premiumDisplayName
-                        ? `Premium: Com carinho, ${premiumDisplayName}`
-                        : "Premium: assinatura personalizada com seu nome"}
-                    </p>
-                  </div>
-                  {!premiumUser && (
-                    <span className="text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] border border-[hsl(var(--border))]">
-                      Premium
-                    </span>
-                  )}
-                </div>
-
-                <div
-                  role={!premiumUser ? "button" : undefined}
-                  tabIndex={!premiumUser ? 0 : undefined}
-                  onClick={() => {
-                    if (!premiumUser) openPremiumGate();
-                  }}
-                  onKeyDown={(e) => {
-                    if (premiumUser) return;
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openPremiumGate();
-                    }
-                  }}
-                  className={`grid gap-3 p-4 rounded-xl border transition ${
-                    premiumUser
-                      ? "bg-[hsl(var(--card))] border-[hsl(var(--border))]"
-                      : "bg-[hsl(var(--muted)/0.65)] border-dashed border-[hsl(var(--border))] cursor-pointer"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[hsl(var(--foreground))]">
-                        Completar minha mensagem
-                      </p>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
-                        Escreva o início da sua mensagem
-                      </p>
-                    </div>
-                    {!premiumUser && (
-                      <span className="text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] border border-[hsl(var(--border))]">
-                        Bloqueado
-                      </span>
-                    )}
-                  </div>
-                  <textarea
-                    rows={3}
-                    disabled={!premiumUser}
-                    value={simpleForm.messageStart}
-                    onChange={(e) =>
-                      setSimpleForm({ ...simpleForm, messageStart: e.target.value })
-                    }
-                    placeholder="Ex.: Boa noite, mulher linda. Passei para deixar um carinho..."
-                    className="px-4 py-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent transition resize-none text-base disabled:opacity-60"
-                  />
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      requirePremium(() =>
-                        setSimpleForm({
-                          ...simpleForm,
-                          premiumMessage: !simpleForm.premiumMessage,
-                        }),
-                      )
-                    }
-                    className={`text-left p-4 rounded-xl border transition ${
-                      premiumUser && simpleForm.premiumMessage
-                        ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)]"
-                        : "border-[hsl(var(--border))] bg-[hsl(var(--card))]"
-                    } ${!premiumUser ? "border-dashed bg-[hsl(var(--muted)/0.65)]" : ""}`}
-                  >
-                    <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
-                      Mensagem Premium
-                    </span>
-                    <span className="block text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                      Texto mais profundo, com aproximadamente 100 a 120 palavras.
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openPremiumGate}
-                    className="text-left p-4 rounded-xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.65)] transition"
-                  >
-                    <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
-                      Imagem para status e redes sociais
-                    </span>
-                    <span className="block text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                      Recurso Premium preparado para uma próxima etapa.
-                    </span>
-                  </button>
-                </div>
 
                 <button
                   type="submit"
-                  className="btn-grad mt-2 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-semibold text-base"
+                  disabled={generating}
+                  className="btn-grad mt-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <span aria-hidden>✨</span>
-                  GERAR MENSAGEM
+                  <span aria-hidden>✦</span>
+                  {generating ? "Gerando..." : "Gerar mensagem"}
                 </button>
               </form>
 
@@ -1768,20 +1507,15 @@ function App() {
                   <p className="font-serif text-lg sm:text-xl leading-relaxed text-[hsl(var(--foreground))] text-balance">
                     “{lastGenerated.text}”
                   </p>
-                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4 whitespace-pre-line">
-                    {getGeneratedSignature(lastGenerated)}
+                  <p className="font-serif italic text-[hsl(var(--muted-foreground))] mt-4">
+                    {SIGNATURE}
                   </p>
 
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
                       onClick={() =>
-                        copyText(
-                          formatWithSignature(
-                            lastGenerated.text,
-                            getGeneratedSignature(lastGenerated),
-                          ),
-                        )
+                        copyText(`${lastGenerated.text}\n\n${SIGNATURE}`)
                       }
                       className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                     >
@@ -1791,32 +1525,13 @@ function App() {
                     <button
                       type="button"
                       onClick={() =>
-                        shareText(
-                          formatWithSignature(
-                            lastGenerated.text,
-                            getGeneratedSignature(lastGenerated),
-                          ),
-                        )
+                        shareText(`${lastGenerated.text}\n\n${SHARE_SIGNATURE}`)
                       }
                       className="btn-grad inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full"
                     >
                       <span aria-hidden>↗</span>
                       Compartilhar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openImageCreator(
-                          lastGenerated.text,
-                          getGeneratedSignature(lastGenerated),
-                        )
-                      }
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
-                    >
-                      <span aria-hidden>▣</span>
-                      Gerar imagem
-                    </button>
-                    <MessageSpeaker text={lastGenerated.text} />
                     <button
                       type="button"
                       onClick={toggleCustomFavorite}
@@ -1831,13 +1546,90 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={regenerate}
-                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
+                      disabled={generating}
+                      onClick={() => void regenerate()}
+                      className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition disabled:opacity-60 disabled:cursor-not-allowed"
                       title="Gerar outra variação com os mesmos dados"
                     >
                       <span aria-hidden>↻</span>
-                      Outra
+                      {generating ? "Gerando..." : "Outra"}
                     </button>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.72)] p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-xs uppercase tracking-[0.2em] text-[hsl(var(--primary))] font-semibold">
+                        Imagem simples
+                      </p>
+                      <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                        Gratuita
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={downloadSimpleGeneratedImage}
+                        className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition"
+                      >
+                        <span aria-hidden>⇩</span>
+                        Baixar imagem
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void shareSimpleGeneratedImage()}
+                        className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition"
+                      >
+                        <span aria-hidden>↗</span>
+                        Compartilhar imagem
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/0.72)] p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-xs uppercase tracking-[0.2em] text-[hsl(var(--accent))] font-semibold">
+                        Imagem personalizada
+                      </p>
+                      {!premiumUser && (
+                        <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                          Bloqueado
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          requirePremium(() =>
+                            exportPremiumGeneratedImage("story"),
+                          )
+                        }
+                        className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition"
+                      >
+                        <span aria-hidden>▯</span>
+                        Status/Stories
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => requirePremium(rotateVisualBackground)}
+                        className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition"
+                      >
+                        <span aria-hidden>◐</span>
+                        {getVisualBackgroundName(visualBackground)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          requirePremium(() =>
+                            exportPremiumGeneratedImage("square"),
+                          )
+                        }
+                        className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition"
+                      >
+                        <span aria-hidden>⇩</span>
+                        Alta qualidade
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1864,15 +1656,13 @@ function App() {
                         </p>
                         <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
                           <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                            {g.tone} · {g.recipient}
+                            {g.mood} · {g.recipient}
                           </span>
                           <div className="flex gap-2 flex-wrap">
                             <button
                               type="button"
                               onClick={() =>
-                                copyText(
-                                  formatWithSignature(g.text, getGeneratedSignature(g)),
-                                )
+                                copyText(`${g.text}\n\n${SIGNATURE}`)
                               }
                               className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
                             >
@@ -1881,22 +1671,12 @@ function App() {
                             <button
                               type="button"
                               onClick={() =>
-                                shareText(
-                                  formatWithSignature(g.text, getGeneratedSignature(g)),
-                                )
+                                shareText(`${g.text}\n\n${SHARE_SIGNATURE}`)
                               }
                               className="btn-grad text-xs font-medium px-3 py-1.5 rounded-full"
                             >
                               Compartilhar
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => openImageCreator(g.text, getGeneratedSignature(g))}
-                              className="text-xs font-medium px-3 py-1.5 rounded-full border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
-                            >
-                              Gerar imagem
-                            </button>
-                            <MessageSpeaker text={g.text} />
                             <button
                               type="button"
                               aria-label="Remover dos favoritos"
@@ -1991,15 +1771,6 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => openImageCreator(viewerItem.text)}
-                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
-                >
-                  <span aria-hidden>▣</span>
-                  Gerar imagem
-                </button>
-                <MessageSpeaker text={viewerItem.text} />
-                <button
-                  type="button"
                   onClick={() => setViewerItem(null)}
                   className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] transition"
                 >
@@ -2015,25 +1786,27 @@ function App() {
       <AuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        onLogin={(user) => setMockUser(user)}
+        onLogin={(loggedUser) => setUser(loggedUser)}
       />
 
       <PremiumModal
         open={premiumOpen}
-        testMode={PREMIUM_TEST_ENABLED}
-        isLoggedIn={Boolean(mockUser)}
+        isLoggedIn={Boolean(user)}
         onClose={() => setPremiumOpen(false)}
-        onActivate={activatePremiumPlaceholder}
+        onLogin={() => {
+          setPremiumOpen(false);
+          setAuthOpen(true);
+        }}
       />
 
       {/* Profile Modal */}
-      {mockUser && (
+      {user && (
         <ProfileModal
           open={profileOpen}
-          user={mockUser}
+          user={user}
           favoritesCount={favorites.length + customFavorites.length}
           onClose={() => setProfileOpen(false)}
-          onLogout={() => setMockUser(null)}
+          onLogout={() => void handleLogout()}
           onShowFavorites={() => {
             setShowFavorites(true);
             setFilter({ kind: "none" });

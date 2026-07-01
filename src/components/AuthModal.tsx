@@ -8,37 +8,17 @@ import {
   type AppUser,
 } from "@/lib/firebase";
 
-export type MockUser = AppUser;
-export type AuthTab = "login" | "cadastro";
-
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  onLogin: (user: MockUser) => void;
-  initialTab?: AuthTab;
+  onLogin: (user: AppUser) => void;
 }
 
+type Tab = "login" | "cadastro";
 type View = "form" | "recover" | "recover-sent";
 
-function AuthErrorAlert({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-xs text-red-700"
-    >
-      <p className="font-semibold">Nao consegui acessar sua conta agora.</p>
-      <p className="mt-1 leading-relaxed">{message}</p>
-    </div>
-  );
-}
-
-export function AuthModal({
-  open,
-  onClose,
-  onLogin,
-  initialTab = "login",
-}: AuthModalProps) {
-  const [tab, setTab] = useState<AuthTab>(initialTab);
+export function AuthModal({ open, onClose, onLogin }: AuthModalProps) {
+  const [tab, setTab] = useState<Tab>("login");
   const [view, setView] = useState<View>("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -49,11 +29,10 @@ export function AuthModal({
 
   useEffect(() => {
     if (!open) return;
-    setTab(initialTab);
     setView("form");
     setError(null);
     setSubmitting(false);
-  }, [initialTab, open]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -65,6 +44,7 @@ export function AuthModal({
   function handleClose() {
     setView("form");
     setError(null);
+    setSubmitting(false);
     onClose();
   }
 
@@ -95,6 +75,20 @@ export function AuthModal({
         tab === "login"
           ? await loginWithEmail(email, password)
           : await signUpWithEmail(name, email, password);
+      onLogin(user);
+      handleClose();
+    } catch (err) {
+      setError(getFriendlyAuthError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogle() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const user = await loginWithGoogle();
       onLogin(user);
       handleClose();
     } catch (err) {
@@ -153,7 +147,7 @@ export function AuthModal({
                 onClick={resetToForm}
                 className="h-8 w-8 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] flex items-center justify-center text-sm transition disabled:opacity-60"
               >
-                {"<"}
+                ←
               </button>
             )}
             <div>
@@ -175,14 +169,14 @@ export function AuthModal({
             onClick={handleClose}
             className="h-9 w-9 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] flex items-center justify-center text-lg leading-none transition disabled:opacity-60"
           >
-            x
+            ×
           </button>
         </div>
 
         {view === "form" && (
           <>
             <div className="flex mx-6 mb-5 rounded-xl border border-[hsl(var(--border))] overflow-hidden bg-[hsl(var(--card))]">
-              {(["login", "cadastro"] as AuthTab[]).map((t) => (
+              {(["login", "cadastro"] as Tab[]).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -203,6 +197,27 @@ export function AuthModal({
             </div>
 
             <div className="px-6 pb-8 grid gap-4">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleGoogle}
+                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] text-sm font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4" />
+                  <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853" />
+                  <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05" />
+                  <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335" />
+                </svg>
+                {submitting ? "Aguarde..." : "Entrar com Google"}
+              </button>
+
+              <div className="flex items-center gap-3">
+                <span className="flex-1 h-px bg-[hsl(var(--border))]" />
+                <span className="text-xs text-[hsl(var(--muted-foreground))]">ou</span>
+                <span className="flex-1 h-px bg-[hsl(var(--border))]" />
+              </div>
+
               <form onSubmit={handleSubmit} className="grid gap-3">
                 {tab === "cadastro" && (
                   <input
@@ -253,7 +268,7 @@ export function AuthModal({
                 </div>
 
                 {error && (
-                  <AuthErrorAlert message={error} />
+                  <p className="text-xs text-red-500 text-center">{error}</p>
                 )}
 
                 <button
@@ -267,42 +282,6 @@ export function AuthModal({
                       ? "Entrar com e-mail"
                       : "Criar minha conta"}
                 </button>
-
-                {tab === "login" && (
-                  <>
-                    <div className="flex items-center gap-3 my-2">
-                      <div className="flex-1 h-px bg-[hsl(var(--border))]" />
-                      <span className="text-xs text-[hsl(var(--muted-foreground))]">ou</span>
-                      <div className="flex-1 h-px bg-[hsl(var(--border))]" />
-                    </div>
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={async () => {
-                        setSubmitting(true);
-                        setError(null);
-                        try {
-                          const user = await loginWithGoogle();
-                          onLogin(user);
-                          handleClose();
-                        } catch (err) {
-                          setError(getFriendlyAuthError(err));
-                        } finally {
-                          setSubmitting(false);
-                        }
-                      }}
-                      className="w-full py-3 rounded-xl text-sm font-semibold border border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))] flex items-center justify-center gap-2 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                      </svg>
-                      Entrar com Google
-                    </button>
-                  </>
-                )}
               </form>
 
               <p className="text-center text-xs text-[hsl(var(--muted-foreground))]">
@@ -312,10 +291,7 @@ export function AuthModal({
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() => {
-                        setTab("cadastro");
-                        setError(null);
-                      }}
+                      onClick={() => { setTab("cadastro"); setError(null); }}
                       className="text-[hsl(var(--primary))] underline underline-offset-2 hover:opacity-80 disabled:opacity-60"
                     >
                       Criar conta
@@ -327,10 +303,7 @@ export function AuthModal({
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() => {
-                        setTab("login");
-                        setError(null);
-                      }}
+                      onClick={() => { setTab("login"); setError(null); }}
                       className="text-[hsl(var(--primary))] underline underline-offset-2 hover:opacity-80 disabled:opacity-60"
                     >
                       Entrar
@@ -345,8 +318,7 @@ export function AuthModal({
         {view === "recover" && (
           <div className="px-6 pb-8 grid gap-5">
             <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed -mt-1">
-              Informe o e-mail da sua conta e enviaremos as instruções para
-              redefinir sua senha.
+              Informe o e-mail da sua conta e enviaremos as instruções para redefinir sua senha.
             </p>
 
             <form onSubmit={handleRecover} className="grid gap-3">
@@ -362,7 +334,7 @@ export function AuthModal({
               />
 
               {error && (
-                <AuthErrorAlert message={error} />
+                <p className="text-xs text-red-500 text-center">{error}</p>
               )}
 
               <button
@@ -380,7 +352,7 @@ export function AuthModal({
               onClick={resetToForm}
               className="text-center text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition disabled:opacity-60"
             >
-              Voltar para o login
+              ← Voltar para o login
             </button>
           </div>
         )}
@@ -389,11 +361,10 @@ export function AuthModal({
           <div className="px-6 pb-8 grid gap-6">
             <div className="flex flex-col items-center text-center gap-3 py-2">
               <div className="h-14 w-14 rounded-full bg-[hsl(var(--primary)/0.1)] flex items-center justify-center text-2xl">
-                @
+                ✉️
               </div>
               <p className="text-sm text-[hsl(var(--foreground))] leading-relaxed font-medium">
-                Se este e-mail estiver cadastrado, enviaremos as instruções para
-                recuperar sua senha.
+                Se este e-mail estiver cadastrado, enviaremos as instruções para recuperar sua senha.
               </p>
               <p className="text-xs text-[hsl(var(--muted-foreground))] leading-relaxed">
                 Verifique também a caixa de spam.
@@ -413,7 +384,7 @@ export function AuthModal({
               onClick={resetToForm}
               className="text-center text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition -mt-3"
             >
-              Voltar para o login
+              ← Voltar para o login
             </button>
           </div>
         )}

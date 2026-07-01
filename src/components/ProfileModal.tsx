@@ -1,8 +1,8 @@
-import type { MockUser } from "@/components/AuthModal";
+import type { AppUser } from "@/lib/firebase";
 
 interface ProfileModalProps {
   open: boolean;
-  user: MockUser;
+  user: AppUser;
   favoritesCount: number;
   onClose: () => void;
   onLogout: () => void;
@@ -19,20 +19,22 @@ export function ProfileModal({
 }: ProfileModalProps) {
   if (!open) return null;
 
-  const initial = user.name.charAt(0).toUpperCase();
+  const displayName = user.name?.trim() || user.email.split("@")[0] || "Alma Escrita";
+  const displayEmail = user.email || "E-mail nao informado";
+  const initial = displayName.charAt(0).toUpperCase();
 
-  // Derive initials (up to 2 chars) for the avatar
-  const parts = user.name.trim().split(" ");
+  const parts = displayName.split(" ");
   const initials =
     parts.length >= 2
       ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
       : initial;
 
-  // Member since: fake date (today's month/year)
-  const memberSince = new Date().toLocaleDateString("pt-BR", {
-    month: "long",
-    year: "numeric",
-  });
+  const memberSince = user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric",
+      })
+    : "Nao informado";
 
   return (
     <div
@@ -71,7 +73,15 @@ export function ProfileModal({
               aria-hidden
               className="h-20 w-20 rounded-2xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] flex items-center justify-center text-white text-3xl font-bold shadow-lg border-4 border-[hsl(var(--background))]"
             >
-              {initials}
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt=""
+                  className="h-full w-full rounded-[0.85rem] object-cover"
+                />
+              ) : (
+                initials
+              )}
             </div>
             <button
               type="button"
@@ -88,10 +98,10 @@ export function ProfileModal({
             id="profile-title"
             className="font-serif text-2xl text-[hsl(var(--foreground))] leading-tight"
           >
-            {user.name}
+            {displayName}
           </h2>
           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-0.5 mb-5">
-            {user.email}
+            {displayEmail}
           </p>
 
           {/* Stats row */}

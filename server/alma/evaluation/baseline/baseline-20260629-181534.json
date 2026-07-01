@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-06-29T21:15:34.000Z",
+  "baselineName": "baseline-20260629-181534.json",
+  "motorVersion": "0.1.0",
+  "openaiModel": "gpt-4.1-mini",
+  "testsExecuted": 10,
+  "scoredTests": 0,
+  "identityAverage": 0,
+  "criteriaAverages": {
+    "acolhimento": 0,
+    "profundidade": 0,
+    "espiritualidade": 0,
+    "esperanca": 0,
+    "poeticidade": 0,
+    "originalidade": 0,
+    "naturalidade": 0
+  },
+  "counts": {
+    "pass": 0,
+    "review": 0,
+    "error": 10
+  },
+  "totalDurationMs": 180247,
+  "tests": [
+    {
+      "promptId": "tristeza",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "aniversario",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "recomeco",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "perda-de-fe",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "bom-dia",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "status",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "romantica",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "saudade",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "gratidao",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    },
+    {
+      "promptId": "ansiedade",
+      "status": "ERROR",
+      "identidadeFinal": null,
+      "ranking": null,
+      "criterios": null
+    }
+  ]
+}
